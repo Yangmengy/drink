@@ -1,0 +1,201 @@
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-primary);
+  padding-bottom: calc(50px + var(--safe-area-bottom) + 24px);
+}
+
+.content {
+  padding: 0 var(--content-padding);
+  padding-top: 4px;
+}
+
+/* ========== 搜索栏 ========== */
+
+.searchBar {
+  margin-bottom: 20px;
+}
+
+/* ========== Hero 卡片 ========== */
+
+.heroCard {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  margin-bottom: 28px;
+  background: var(--bg-secondary);
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-out);
+  animation: fadeIn var(--duration-normal) var(--ease-out) forwards;
+}
+
+.heroCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(10, 132, 255, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(175, 82, 222, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.heroCard:active {
+  transform: scale(0.98);
+}
+
+.heroEmoji {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.heroTitle {
+  font-size: var(--font-size-title2);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.024em;
+}
+
+.heroSubtitle {
+  font-size: var(--font-size-subhead);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.heroAction {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-subhead);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  margin-top: 4px;
+}
+
+.heroAction svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.heroCard:active .heroAction svg {
+  transform: translateX(3px);
+}
+
+/* ========== Section ========== */
+
+.section {
+  margin-bottom: 24px;
+}
+
+/* ========== 横向滚动推荐 ========== */
+
+.recommendScroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0 8px;
+  margin: 0 calc(-1 * var(--content-padding));
+  padding-left: var(--content-padding);
+  padding-right: var(--content-padding);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.recommendScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.recommendCard {
+  flex-shrink: 0;
+  width: 120px;
+  height: 148px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.recommendCard:active {
+  transform: scale(0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.recEmoji {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.recInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.recName {
+  font-size: var(--font-size-subhead);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.recMeta {
+  font-size: var(--font-size-caption1);
+  color: var(--text-tertiary);
+}
+
+/* ========== 分类标签 ========== */
+
+.categoryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ========== 2 列网格 ========== */
+
+.recipeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ========== 空状态 ========== */
+
+.emptyState {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 8px;
+  color: var(--text-tertiary);
+}
+
+.emptyEmoji {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: var(--font-size-subhead);
+}
+
+/* ========== 动画 ========== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

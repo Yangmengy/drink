@@ -1,0 +1,220 @@
+/**
+ * 调酒 App - iOS 风格设计 Token
+ * 基于 Apple Human Interface Guidelines
+ */
+
+:root {
+  /* ========== 色彩系统 ========== */
+  
+  /* 主色调 */
+  --color-primary: #FF9500;
+  --color-primary-light: #FFB340;
+  --color-primary-dark: #CC7700;
+  
+  /* 辅助色 */
+  --color-accent: #5856D6;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-error: #FF3B30;
+  --color-info: #007AFF;
+  
+  /* 背景色 - 浅色模式 */
+  --bg-primary: #F2F2F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: rgba(255, 255, 255, 0.8);
+  
+  /* 文字色 - 浅色模式 */
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --text-quaternary: #8E8E93;
+  
+  /* 分割线 */
+  --divider: rgba(60, 60, 67, 0.12);
+  --border: rgba(0, 0, 0, 0.04);
+  
+  /* 酒类分类颜色 */
+  --cocktail-classic: #8E44AD;
+  --cocktail-tropical: #E67E22;
+  --cocktail-refreshing: #3498DB;
+  --cocktail-strong: #C0392B;
+  --cocktail-sweet: #F39C12;
+  --cocktail-mocktail: #27AE60;
+  
+  /* ========== 字体系统 ========== */
+  
+  --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Display", 
+                      "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-family-mono: "SF Mono", Menlo, Monaco, monospace;
+  
+  /* 字号 */
+  --font-size-h1: 34px;
+  --font-size-h2: 28px;
+  --font-size-h3: 22px;
+  --font-size-h4: 20px;
+  --font-size-body: 17px;
+  --font-size-callout: 16px;
+  --font-size-subhead: 15px;
+  --font-size-footnote: 13px;
+  --font-size-caption: 12px;
+  --font-size-caption2: 11px;
+  
+  /* 字重 */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* 行高 */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.4;
+  --line-height-relaxed: 1.6;
+  
+  /* ========== 间距系统 (8pt Grid) ========== */
+  
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  
+  /* ========== 圆角 ========== */
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  
+  /* ========== 图标尺寸 ========== */
+  
+  --icon-xs: 16px;
+  --icon-sm: 20px;
+  --icon-md: 24px;
+  --icon-lg: 32px;
+  --icon-xl: 48px;
+  
+  /* ========== 阴影 ========== */
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
+  --shadow-primary: 0 4px 12px rgba(255, 149, 0, 0.3);
+  
+  /* ========== 动画 ========== */
+  
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  
+  /* ========== 层级 (Z-index) ========== */
+  
+  --z-base: 1;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  
+  /* ========== 安全区域 ========== */
+  
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+  --safe-area-left: env(safe-area-inset-left);
+  --safe-area-right: env(safe-area-inset-right);
+  
+  --content-padding: 16px;
+  --content-max-width: 428px;
+}
+
+/* ========== 深色模式 ========== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 背景色 - 深色模式 */
+    --bg-primary: #000000;
+    --bg-secondary: #1C1C1E;
+    --bg-tertiary: rgba(28, 28, 30, 0.8);
+    
+    /* 文字色 - 深色模式 */
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(235, 235, 245, 0.6);
+    --text-tertiary: rgba(235, 235, 245, 0.3);
+    --text-quaternary: #8E8E93;
+    
+    /* 分割线 - 深色模式 */
+    --divider: rgba(84, 84, 88, 0.6);
+    --border: rgba(255, 255, 255, 0.08);
+    
+    /* 阴影 - 深色模式 */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* 手动切换深色模式 */
+[data-theme="dark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #1C1C1E;
+  --bg-tertiary: rgba(28, 28, 30, 0.8);
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(235, 235, 245, 0.6);
+  --text-tertiary: rgba(235, 235, 245, 0.3);
+  --text-quaternary: #8E8E93;
+  
+  --divider: rgba(84, 84, 88, 0.6);
+  --border: rgba(255, 255, 255, 0.08);
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.8);
+}
+
+/* ========== 毛玻璃效果 ========== */
+
+.glass {
+  background: var(--bg-tertiary);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-sm);
+}
+
+.glass-dark {
+  background: rgba(28, 28, 30, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-tabbar {
+  background: rgba(242, 242, 247, 0.8);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-top: 0.5px solid rgba(0, 0, 0, 0.05);
+}
+
+.glass-search {
+  background: rgba(142, 142, 147, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* ========== 响应式断点 ========== */
+
+@custom-media --sm (min-width: 375px);
+@custom-media --md (min-width: 390px);
+@custom-media --lg (min-width: 428px);
+@custom-media --xl (min-width: 768px);
+@custom-media --xxl (min-width: 1024px);

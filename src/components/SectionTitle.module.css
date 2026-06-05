@@ -1,0 +1,24 @@
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.title {
+  font-size: var(--font-size-title3);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.022em;
+}
+
+.action {
+  font-size: var(--font-size-subhead);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-regular);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.action:active {
+  opacity: 0.6;
+}
