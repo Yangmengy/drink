@@ -15,6 +15,16 @@ async function adaptDBRecipeToRecipe(dbRecipe: DBRecipe): Promise<Recipe> {
     }
   }
 
+  const parseFlavorProfile = (flavor: any) => {
+    if (!flavor) return null;
+    if (typeof flavor === 'object') return flavor;
+    try {
+      return JSON.parse(flavor);
+    } catch {
+      return null;
+    }
+  };
+
   return {
     id: dbRecipe.id,
     nameZh: dbRecipe.name_zh,
@@ -30,6 +40,7 @@ async function adaptDBRecipeToRecipe(dbRecipe: DBRecipe): Promise<Recipe> {
     instructions: dbRecipe.description || "",
     story: dbRecipe.story || "",
     rating: dbRecipe.view_count > 0 ? 4.5 : 0,
+    flavorProfile: parseFlavorProfile(dbRecipe.flavor_profile),
   };
 }
 
@@ -98,29 +109,10 @@ export const useRecipeStore = create<RecipeState>((set) => ({
         }
       }
 
-      // 解析 JSON 字段
-      const parseTags = (tags: string | null): string[] => {
-        if (!tags) return [];
+      const parseArray = (jsonString: string | null): string[] => {
+        if (!jsonString) return [];
         try {
-          return JSON.parse(tags);
-        } catch {
-          return [];
-        }
-      };
-
-      const parseOccasion = (occasion: string | null): string[] => {
-        if (!occasion) return [];
-        try {
-          return JSON.parse(occasion);
-        } catch {
-          return [];
-        }
-      };
-
-      const parseSeason = (season: string | null): string[] => {
-        if (!season) return [];
-        try {
-          return JSON.parse(season);
+          return JSON.parse(jsonString);
         } catch {
           return [];
         }
@@ -134,44 +126,63 @@ export const useRecipeStore = create<RecipeState>((set) => ({
           return null;
         }
       };
+      
+      const parsePairing = (pairing: string | null) => {
+        if (!pairing) return null;
+        try {
+          return JSON.parse(pairing);
+        } catch {
+          return null;
+        }
+      };
 
-      // 转换为前端 RecipeDetail 类型
-      const detail: RecipeDetail = {
-        id: result.recipe.id,
-        nameZh: result.recipe.name_zh,
-        nameEn: result.recipe.name_en || "",
-        image: imageUrl,
-        difficulty: result.recipe.difficulty <= 2 ? "Easy" : result.recipe.difficulty <= 4 ? "Medium" : "Hard",
-        abv: result.recipe.abv,
-        glass: result.recipe.glass_type || "highball",
-        glassIcon: "🍸",
-        category: result.recipe.category,
-        tags: parseTags(result.recipe.tags),
-        description: result.recipe.description || "",
-        story: result.recipe.story || "",
-        method: result.recipe.method,
-        garnish: result.recipe.garnish,
-        iceType: result.recipe.ice_type,
-        flavorProfile: parseFlavorProfile(result.recipe.flavor_profile),
-        occasion: parseOccasion(result.recipe.occasion),
-        season: parseSeason(result.recipe.season),
-        origin: result.recipe.origin,
-        yearCreated: result.recipe.year_created,
-        prepTime: result.recipe.prep_time,
-        ingredients: result.ingredients.map((item: any) => ({
-          name: item.ingredient.name_zh,
-          amount: item.recipe_ingredient.amount,
-          unit: item.recipe_ingredient.unit,
-          isOptional: item.recipe_ingredient.is_optional,
-          inUserInventory: false, // TODO: 后续根据用户库存判断
-        })),
-        steps: result.steps.map((step: any) => ({
-          stepNumber: step.step_number,
-          title: step.title,
-          instruction: step.instruction,
-          duration: step.duration,
-        })),
+        // 获取用户库存
+        const inventory = await invoke<any[]>("get_inventory");
+        const ownedIngredientIds = new Set(inventory.filter(i => i.owned).map(i => i.ingredient_id));
+
+        // 转换为前端 RecipeDetail 类型
+        const detail: RecipeDetail = {
+          id: result.recipe.id,
+          nameZh: result.recipe.name_zh,
+          nameEn: result.recipe.name_en || "",
+          image: imageUrl,
+          difficulty: result.recipe.difficulty <= 2 ? "Easy" : result.recipe.difficulty <= 4 ? "Medium" : "Hard",
+          abv: result.recipe.abv,
+          glass: result.recipe.glass_type || "highball",
+          glassIcon: "🍸",
+          category: result.recipe.category,
+          tags: parseArray(result.recipe.tags),
+          description: result.recipe.description || "",
+          story: result.recipe.story || "",
+          method: result.recipe.method,
+          garnish: result.recipe.garnish,
+          iceType: result.recipe.ice_type,
+          flavorProfile: parseFlavorProfile(result.recipe.flavor_profile),
+          occasion: parseArray(result.recipe.occasion),
+          season: parseArray(result.recipe.season),
+          mood: parseArray(result.recipe.mood),
+          pairing: parsePairing(result.recipe.pairing),
+          origin: result.recipe.origin,
+          yearCreated: result.recipe.year_created,
+          creator: result.recipe.creator,
+          variations: parseArray(result.recipe.variations),
+          prepTime: result.recipe.prep_time,
+          ingredients: result.ingredients.map((item: any) => ({
+            id: item.ingredient.id,
+            name: item.ingredient.name_zh,
+            amount: item.recipe_ingredient.amount,
+            unit: item.recipe_ingredient.unit,
+            isOptional: item.recipe_ingredient.is_optional,
+            inUserInventory: ownedIngredientIds.has(item.ingredient.id),
+          })),
+          steps: result.steps.map((step: any) => ({
+            stepNumber: step.step_number,
+            title: step.title,
+            instruction: step.instruction,
+            duration: step.duration,
+          })),
         isFavorite: result.recipe.is_favorite,
+        isIba: result.recipe.is_iba,
         viewCount: result.recipe.view_count,
         source: result.recipe.source,
       };

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Package, Search, Plus, Check } from 'lucide-react';
+import { Package, Search, Check } from 'lucide-react';
 import { Navbar } from '@/components';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import styles from './MyBarPage.module.css';
@@ -100,11 +100,11 @@ export function MyBarPage() {
                   >
                     <div className={styles.iconContainer}>
                       <span className={styles.icon}>
-                        {ingredient.category === 'spirit' || ingredient.category === 'spirits' ? '🥃' :
+                        {ingredient.category === 'spirit' || (ingredient.category as string) === 'spirits' ? '🥃' :
                          ingredient.category === 'liqueur' ? '🍾' :
-                         ingredient.category === 'mixer' || ingredient.category === 'juice' ? '🧃' :
+                         ingredient.category === 'mixer' || (ingredient.category as string) === 'juice' ? '🧃' :
                          ingredient.category === 'syrup' ? '🍯' :
-                         ingredient.category === 'garnish' || ingredient.category === 'herb' ? '🌿' :
+                         ingredient.category === 'garnish' || (ingredient.category as string) === 'herb' ? '🌿' :
                          ingredient.category === 'ice' ? '🧊' : '🍹'}
                       </span>
                       {isOwned && (
@@ -114,7 +114,14 @@ export function MyBarPage() {
                       )}
                     </div>
                     <div className={styles.info}>
-                      <div className={styles.name}>{ingredient.name_zh}</div>
+                      <div 
+                        className={styles.name}
+                        style={{ 
+                          fontSize: ingredient.name_zh.length >= 7 ? '10px' : ingredient.name_zh.length === 6 ? '11px' : '13px'
+                        }}
+                      >
+                        {ingredient.name_zh}
+                      </div>
                       <div className={styles.category}>{categoryNames[ingredient.category] || ingredient.category}</div>
                     </div>
                   </div>

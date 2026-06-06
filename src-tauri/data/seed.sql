@@ -52,12 +52,25 @@ INSERT OR IGNORE INTO ingredients VALUES
 -- ============================================
 
 -- Margarita (玛格丽特)
-INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, story, method, color, tags, flavor_profile, occasion, season, mood, origin, year_created, creator, variations, pairing, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'margarita-classic',
     '玛格丽特',
     'Margarita',
     'classic',
     '经典龙舌兰鸡尾酒，酸甜平衡，是全球最受欢迎的鸡尾酒之一',
+    '传说在 1930 年代，一位酒保为他那对烈酒过敏、唯独能喝龙舌兰的初恋女友 Margarita 创作了这款酒。杯口的那圈盐边，据说象征着思念的眼泪。',
+    '摇和法 (Shake)',
+    '#E0F2F1',
+    '["经典", "酸甜", "夏日", "龙舌兰"]',
+    '{"sweet": 2, "sour": 4, "bitter": 1, "strong": 3}',
+    '["派对", "聚会", "餐前"]',
+    '["夏季", "春季"]',
+    '["欢乐", "放松", "热情"]',
+    '墨西哥',
+    1938,
+    'Carlos "Danny" Herrera',
+    '["Tommy''s Margarita (汤米玛格丽特)", "Frozen Margarita (冰沙玛格丽特)", "Strawberry Margarita (草莓玛格丽特)"]',
+    '{"food": ["墨西哥塔可", "玉米片与莎莎酱", "烤海鲜"], "music": ["拉丁流行", "Bossa Nova"]}',
     NULL,
     'margarita',
     'cubed',
@@ -76,15 +89,28 @@ INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, imag
 );
 
 -- Mojito (莫吉托)
-INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, story, method, color, tags, flavor_profile, occasion, season, mood, origin, year_created, creator, variations, pairing, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'mojito-classic',
     '莫吉托',
     'Mojito',
     'tropical',
     '古巴经典鸡尾酒，清爽薄荷风味，夏日首选',
+    '源自古巴哈瓦那，曾是海盗和水手用于预防坏血病的饮品。大文豪海明威更是将其推向世界，他曾留下名言："My mojito in La Bodeguita, My daiquiri in El Floridita"。',
+    '捣和法 (Muddle & Build)',
+    '#F1F8E9',
+    '["清爽", "薄荷", "夏日", "朗姆"]',
+    '{"sweet": 3, "sour": 3, "bitter": 0, "strong": 2}',
+    '["沙滩", "下午茶", "聚会"]',
+    '["夏季"]',
+    '["清爽", "活力", "悠闲"]',
+    '古巴哈瓦那',
+    1586,
+    'Sir Francis Drake (传闻)',
+    '["Strawberry Mojito (草莓莫吉托)", "Passionfruit Mojito (百香果莫吉托)", "Virgin Mojito (无酒精莫吉托)"]',
+    '{"food": ["古巴三明治", "海鲜沙拉", "轻快小吃"], "music": ["加勒比雷鬼", "古巴爵士"]}',
     NULL,
     'highball',
-    'cubed',
+    'crushed',
     '薄荷枝 + 青柠片',
     10.0,
     2,
@@ -100,16 +126,29 @@ INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, imag
 );
 
 -- White Russian (白俄罗斯)
-INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, story, method, color, tags, flavor_profile, occasion, season, mood, origin, year_created, creator, variations, pairing, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'white-russian',
     '白俄罗斯',
     'White Russian',
     'classic',
     '奶油咖啡味鸡尾酒，口感丝滑香甜',
+    '尽管名字带有"俄罗斯"，但其实诞生于布鲁塞尔。电影《谋杀绿脚趾》(The Big Lebowski) 中主角 "The Dude" 对这款酒的痴迷，使它在 1990 年代重获极高的人气。',
+    '直调法 (Build)',
+    '#EFEBE9',
+    '["咖啡", "奶香", "丝滑", "伏特加"]',
+    '{"sweet": 4, "sour": 0, "bitter": 2, "strong": 3}',
+    '["餐后", "深夜", "独饮"]',
+    '["冬季", "秋季"]',
+    '["舒适", "慵懒", "温暖"]',
+    '比利时布鲁塞尔',
+    1949,
+    'Gustave Tops',
+    '["Black Russian (黑俄罗斯)", "Blind Russian (盲俄罗斯 - 用百利甜替代奶油)"]',
+    '{"food": ["提拉米苏", "巧克力慕斯", "坚果"], "music": ["Lofi 嘻哈", "蓝调爵士"]}',
     NULL,
     'old-fashioned',
     'cubed',
-    '无',
+    '无 / 咖啡豆几粒',
     18.0,
     1,
     3,

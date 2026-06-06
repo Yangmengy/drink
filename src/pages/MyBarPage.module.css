@@ -99,7 +99,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -169,16 +169,15 @@
 
 .name {
   width: 100%;
-  font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
-  height: 15.6px; /* fixed height */
   color: var(--color-text-primary);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  white-space: nowrap;
 }
 
 .category {

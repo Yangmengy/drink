@@ -32,10 +32,12 @@ export interface Recipe {
   instructions: string;
   story: string;
   rating: number;
+  flavorProfile?: FlavorProfile | null;
 }
 
 // 详情页专用类型
 export interface RecipeDetailIngredient {
+  id: string;
   name: string;
   amount: number;
   unit: string;
@@ -69,12 +71,17 @@ export interface RecipeDetail {
   flavorProfile: FlavorProfile | null;
   occasion: string[];
   season: string[];
+  mood: string[];
+  pairing: Pairing | null;
   origin: string | null;
   yearCreated: number | null;
+  creator: string | null;
+  variations: string[];
   prepTime: number | null;
   ingredients: RecipeDetailIngredient[];
   steps: RecipeDetailStep[];
   isFavorite: boolean;
+  isIba: boolean;
   viewCount: number;
   source: string | null; // 'custom' 表示用户自定义，null 或其他表示内置
 }

@@ -6,6 +6,26 @@ import { useRecipeStore } from '@/stores/recipeStore';
 import type { Recipe } from '@/types';
 import styles from './DiscoverPage.module.css';
 
+const CATEGORY_MAP: Record<string, string> = {
+  'classic': '经典',
+  'contemporary': '现代',
+  'tropical': '热带',
+  'short': '短饮',
+  'long': '长饮',
+  'mocktail': '无酒精',
+  'Gin': '金酒基底',
+  'Rum': '朗姆基底',
+  'Whisky': '威士忌基底',
+  'Tequila': '龙舌兰基底',
+  'Vodka': '伏特加基底',
+  'Brandy': '白兰地基底',
+  'Liqueur': '利口酒',
+};
+
+function translateCategory(cat: string) {
+  return CATEGORY_MAP[cat] || cat;
+}
+
 // 动态计算分类
 function useCategories(recipes: Recipe[]) {
   return useMemo(() => {
@@ -15,7 +35,7 @@ function useCategories(recipes: Recipe[]) {
       const cat = r.category;
       if (cat && !seen.has(cat)) {
         seen.add(cat);
-        cats.push({ key: cat, label: cat });
+        cats.push({ key: cat, label: translateCategory(cat) });
       }
     }
     return cats;
@@ -25,13 +45,14 @@ function useCategories(recipes: Recipe[]) {
 export function DiscoverPage() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedAbv, setSelectedAbv] = useState<string | null>(null);
+  const [selectedTaste, setSelectedTaste] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
   const { recipes, fetchRecipes } = useRecipeStore();
 
   useEffect(() => {
-    // 页面加载时获取全部数据（受后端默认 LIMIT 控制）
     fetchRecipes();
   }, [fetchRecipes]);
 
@@ -50,8 +71,23 @@ export function DiscoverPage() {
           r.nameEn.toLowerCase().includes(q)
       );
     }
+    if (selectedAbv) {
+      if (selectedAbv === 'low') result = result.filter(r => r.abv != null && r.abv < 15);
+      if (selectedAbv === 'medium') result = result.filter(r => r.abv != null && r.abv >= 15 && r.abv <= 25);
+      if (selectedAbv === 'high') result = result.filter(r => r.abv != null && r.abv > 25);
+    }
+    if (selectedTaste) {
+      result = result.filter(r => {
+        if (!r.flavorProfile) return false;
+        if (selectedTaste === 'sweet') return r.flavorProfile.sweet >= 3;
+        if (selectedTaste === 'sour') return r.flavorProfile.sour >= 3;
+        if (selectedTaste === 'bitter') return r.flavorProfile.bitter >= 3;
+        if (selectedTaste === 'strong') return r.flavorProfile.strong >= 4;
+        return true;
+      });
+    }
     return result;
-  }, [recipes, selectedCategory, searchQuery]);
+  }, [recipes, selectedCategory, searchQuery, selectedAbv, selectedTaste]);
 
   const featuredRecipes = useMemo(() => recipes.slice(0, 8), [recipes]);
 
@@ -66,7 +102,6 @@ export function DiscoverPage() {
 
   return (
     <div className={styles.page}>
-      {/* 顶部：大标题 + 通知 */}
       <Navbar
         title="Mixology"
         subtitle=""
@@ -75,7 +110,6 @@ export function DiscoverPage() {
       />
 
       <div className={styles.content}>
-        {/* 搜索栏 */}
         <SearchBar
           placeholder="搜索鸡尾酒、原料、配方..."
           value={searchQuery}
@@ -119,7 +153,6 @@ export function DiscoverPage() {
           </div>
         </div>
 
-        {/* 分类浏览 */}
         <div className={styles.section}>
           <SectionTitle>分类浏览</SectionTitle>
           <div className={styles.categoryScroll}>
@@ -136,6 +169,29 @@ export function DiscoverPage() {
                 {cat.label}
               </Tag>
             ))}
+          </div>
+
+          {/* 高级筛选区 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+            <div className={styles.filterRow}>
+              <span className={styles.filterLabel}>酒精度:</span>
+              <div className={styles.categoryScroll} style={{ margin: 0, padding: '2px 0' }}>
+                <Tag className={styles.filterTag} selected={selectedAbv === null} onClick={() => setSelectedAbv(null)}>不限</Tag>
+                <Tag className={styles.filterTag} selected={selectedAbv === 'low'} onClick={() => setSelectedAbv('low')}>微醺 (&lt;15%)</Tag>
+                <Tag className={styles.filterTag} selected={selectedAbv === 'medium'} onClick={() => setSelectedAbv('medium')}>中度 (15-25%)</Tag>
+                <Tag className={styles.filterTag} selected={selectedAbv === 'high'} onClick={() => setSelectedAbv('high')}>烈酒 (&gt;25%)</Tag>
+              </div>
+            </div>
+            <div className={styles.filterRow}>
+              <span className={styles.filterLabel}>主风味:</span>
+              <div className={styles.categoryScroll} style={{ margin: 0, padding: '2px 0' }}>
+                <Tag className={styles.filterTag} selected={selectedTaste === null} onClick={() => setSelectedTaste(null)}>不限</Tag>
+                <Tag className={styles.filterTag} selected={selectedTaste === 'sweet'} onClick={() => setSelectedTaste('sweet')}>偏甜</Tag>
+                <Tag className={styles.filterTag} selected={selectedTaste === 'sour'} onClick={() => setSelectedTaste('sour')}>偏酸</Tag>
+                <Tag className={styles.filterTag} selected={selectedTaste === 'bitter'} onClick={() => setSelectedTaste('bitter')}>偏苦</Tag>
+                <Tag className={styles.filterTag} selected={selectedTaste === 'strong'} onClick={() => setSelectedTaste('strong')}>烈性</Tag>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1,14 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Clock, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, Heart, Clock, Bookmark, BookmarkCheck, Trash2, Utensils, Music } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
-import { todoApi } from '@/api/client';
+import { todoApi, inventoryApi } from '@/api/client';
 import styles from './RecipeDetailPage.module.css';
 
 const DIFFICULTY_DOTS: Record<string, number> = {
   Easy: 1,
   Medium: 3,
   Hard: 5,
+};
+
+// 糖果色生成函数
+const getCandyColor = (str: string) => {
+  const candyColors = [
+    { bg: '#FFF0F6', color: '#EB2F96' }, // Pink
+    { bg: '#F0F5FF', color: '#2F54EB' }, // Blue
+    { bg: '#F6FFED', color: '#52C41A' }, // Green
+    { bg: '#FFF7E6', color: '#FA8C16' }, // Orange
+    { bg: '#F9F0FF', color: '#722ED1' }, // Purple
+    { bg: '#E6FFFB', color: '#13C2C2' }, // Cyan
+  ];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return candyColors[Math.abs(hash) % candyColors.length];
 };
 
 export function RecipeDetailPage() {
@@ -42,16 +59,35 @@ export function RecipeDetailPage() {
     }
   };
 
+  const handleToggleInventory = async (ingredientId: string, currentlyOwned: boolean) => {
+    try {
+      if (currentlyOwned) {
+        await inventoryApi.remove(ingredientId);
+      } else {
+        await inventoryApi.add(ingredientId);
+      }
+      useRecipeStore.setState(state => {
+        if (!state.currentRecipe) return state;
+        return {
+          currentRecipe: {
+            ...state.currentRecipe,
+            ingredients: state.currentRecipe.ingredients.map(ing => 
+              ing.id === ingredientId ? { ...ing, inUserInventory: !currentlyOwned } : ing
+            )
+          }
+        };
+      });
+    } catch (e) {
+      console.error('Failed to toggle inventory:', e);
+    }
+  };
+
   const handleDelete = async () => {
     if (!currentRecipe || !id) return;
-    
     const success = await deleteRecipe(id);
-    
     if (success) {
-      // 删除成功，返回首页
       navigate('/', { replace: true });
     } else {
-      // 删除失败，显示错误提示
       alert('删除失败，请重试');
       setShowDeleteConfirm(false);
     }
@@ -87,18 +123,15 @@ export function RecipeDetailPage() {
 
   return (
     <div className={styles.page}>
-      {/* 沉浸式顶部导航 */}
       <header className={styles.header}>
         <button className={styles.navButton} onClick={() => navigate(-1)}>
           <ArrowLeft size={20} />
         </button>
         <div className={styles.navActions}>
-          {/* 删除按钮 - 仅自定义配方显示 */}
           {isCustomRecipe && (
             <button 
               className={`${styles.navButton} ${styles.deleteIconButton}`}
               onClick={() => setShowDeleteConfirm(true)}
-              title="删除配方"
             >
               <Trash2 size={20} />
             </button>
@@ -118,7 +151,7 @@ export function RecipeDetailPage() {
         </div>
       </header>
 
-      {/* 沉浸式 Hero 区域 */}
+      {/* Hero Section */}
       <div className={styles.hero}>
         {currentRecipe.image ? (
           <img src={currentRecipe.image} alt={currentRecipe.nameEn} className={styles.heroImage} />
@@ -126,86 +159,99 @@ export function RecipeDetailPage() {
           <div className={styles.heroPlaceholder}>🍸</div>
         )}
         <div className={styles.heroOverlay}>
-          <div className={styles.heroTitles}>
-            <h1 className={styles.heroNameZh}>{currentRecipe.nameZh}</h1>
-            <span className={styles.heroNameEn}>{currentRecipe.nameEn}</span>
-          </div>
           {currentRecipe.category && (
             <span className={styles.heroCategory}>{currentRecipe.category}</span>
           )}
+          <div className={styles.heroTitles}>
+            <h1 className={styles.heroNameZh}>
+              {currentRecipe.nameZh}
+              {currentRecipe.isIba && <span className={styles.ibaBadge}>IBA CLASSIC</span>}
+            </h1>
+            <span className={styles.heroNameEn}>{currentRecipe.nameEn}</span>
+          </div>
         </div>
       </div>
 
-      {/* 内容区域 */}
       <div className={styles.content}>
-        {/* 拟物毛玻璃信息卡片 */}
-        <div className={styles.infoCard}>
-          <div className={styles.infoItem}>
-            <span className={styles.infoIcon}>💧</span>
-            <span className={styles.infoLabel}>酒精度</span>
-            <span className={styles.infoValue}>
-              {currentRecipe.abv != null ? `${currentRecipe.abv}%` : 'N/A'}
-            </span>
+        
+        {/* Key Stats Dashboard */}
+        <div className={styles.statsGrid}>
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>💧</span>
+            <span className={styles.statLabel}>ABV</span>
+            <span className={styles.statValue}>{currentRecipe.abv != null ? `${currentRecipe.abv}%` : 'N/A'}</span>
           </div>
-          <div className={styles.infoDivider} />
-          <div className={styles.infoItem}>
-            <span className={styles.infoIcon}>⭐️</span>
-            <span className={styles.infoLabel}>难度</span>
-            <span className={styles.infoDots}>
-              {'●'.repeat(dotCount)}{'○'.repeat(5 - dotCount)}
-            </span>
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>⭐️</span>
+            <span className={styles.statLabel}>Diff</span>
+            <span className={styles.statDots}>{'●'.repeat(dotCount)}{'○'.repeat(5 - dotCount)}</span>
           </div>
-          <div className={styles.infoDivider} />
-          <div className={styles.infoItem}>
-            <span className={styles.infoIcon}>🍸</span>
-            <span className={styles.infoLabel}>杯型</span>
-            <span className={styles.infoValue}>{currentRecipe.glass}</span>
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>🍸</span>
+            <span className={styles.statLabel}>Glass</span>
+            <span className={styles.statValue}>{currentRecipe.glass || 'N/A'}</span>
           </div>
-          {currentRecipe.prepTime && (
-            <>
-              <div className={styles.infoDivider} />
-              <div className={styles.infoItem}>
-                <Clock size={16} className={styles.infoIconText} />
-                <span className={styles.infoLabel}>时长</span>
-                <span className={styles.infoValue}>{currentRecipe.prepTime}m</span>
-              </div>
-            </>
-          )}
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>⏱</span>
+            <span className={styles.statLabel}>Time</span>
+            <span className={styles.statValue}>{currentRecipe.prepTime ? `${currentRecipe.prepTime}m` : 'N/A'}</span>
+          </div>
         </div>
 
-        {/* 故事区块 - 杂志风排版 */}
-        {currentRecipe.story && (
-          <div className={styles.storyBlock}>
-            <div className={styles.storyQuoteIcon}>"</div>
-            <p className={styles.storyText}>{currentRecipe.story}</p>
+        {/* Mood & Occasion (Candy Tags) */}
+        {(currentRecipe.mood?.length > 0 || currentRecipe.occasion?.length > 0 || currentRecipe.season?.length > 0) && (
+          <div className={styles.candyTags}>
+            {currentRecipe.mood?.map((m, i) => {
+              const c = getCandyColor(m);
+              return <span key={`mood-${i}`} className={styles.candyTag} style={{ background: c.bg, color: c.color }}>{m}</span>;
+            })}
+            {currentRecipe.occasion?.map((o, i) => {
+              const c = getCandyColor(o);
+              return <span key={`occ-${i}`} className={styles.candyTag} style={{ background: c.bg, color: c.color }}>{o}</span>;
+            })}
+            {currentRecipe.season?.map((s, i) => {
+              const c = getCandyColor(s);
+              return <span key={`season-${i}`} className={styles.candyTag} style={{ background: c.bg, color: c.color }}>{s}</span>;
+            })}
           </div>
         )}
 
-        {/* 风味雷达 / 进度条 */}
+        {/* Tasting Notes */}
+        {(currentRecipe.story || currentRecipe.description) && (
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>品鉴笔记</h2>
+            <div className={styles.tastingNotes}>
+              {currentRecipe.story && <p className={styles.storyText}>{currentRecipe.story}</p>}
+              {currentRecipe.description && <p className={styles.descriptionText}>{currentRecipe.description}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Flavor Profile */}
         {currentRecipe.flavorProfile && (
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>风味档案</h2>
+            <h2 className={styles.sectionTitle}>风味雷达</h2>
             <div className={styles.flavorBars}>
               <div className={styles.flavorRow}>
-                <span className={styles.flavorLabel}>甜 (Sweet)</span>
+                <span className={styles.flavorLabel}>甜 Sweet</span>
                 <div className={styles.flavorTrack}>
                   <div className={styles.flavorFill} style={{ width: `${(currentRecipe.flavorProfile.sweet / 5) * 100}%`, background: '#FF9A9E' }} />
                 </div>
               </div>
               <div className={styles.flavorRow}>
-                <span className={styles.flavorLabel}>酸 (Sour)</span>
+                <span className={styles.flavorLabel}>酸 Sour</span>
                 <div className={styles.flavorTrack}>
                   <div className={styles.flavorFill} style={{ width: `${(currentRecipe.flavorProfile.sour / 5) * 100}%`, background: '#FAD0C4' }} />
                 </div>
               </div>
               <div className={styles.flavorRow}>
-                <span className={styles.flavorLabel}>苦 (Bitter)</span>
+                <span className={styles.flavorLabel}>苦 Bitter</span>
                 <div className={styles.flavorTrack}>
                   <div className={styles.flavorFill} style={{ width: `${(currentRecipe.flavorProfile.bitter / 5) * 100}%`, background: '#A18CD1' }} />
                 </div>
               </div>
               <div className={styles.flavorRow}>
-                <span className={styles.flavorLabel}>烈 (Strong)</span>
+                <span className={styles.flavorLabel}>烈 Strong</span>
                 <div className={styles.flavorTrack}>
                   <div className={styles.flavorFill} style={{ width: `${(currentRecipe.flavorProfile.strong / 5) * 100}%`, background: '#FBC2EB' }} />
                 </div>
@@ -214,39 +260,28 @@ export function RecipeDetailPage() {
           </div>
         )}
 
-        {/* 描述与标签 */}
-        {currentRecipe.description && (
-          <p className={styles.description}>{currentRecipe.description}</p>
-        )}
-        {currentRecipe.tags.length > 0 && (
-          <div className={styles.tags}>
-            {currentRecipe.tags.map((tag, index) => (
-              <span key={index} className={styles.tag}>{tag}</span>
-            ))}
-          </div>
-        )}
-
-        {/* 原料清单 - Checklist */}
+        {/* Ingredients */}
         {hasIngredients && (
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>原料清单</h2>
-              {totalCount > 0 && (
-                <span className={styles.ingredientCount}>
-                  已拥有 {ownedCount}/{totalCount}
-                </span>
-              )}
+              <h2 className={styles.sectionTitle}>配方原料</h2>
+              {totalCount > 0 && <span className={styles.sectionSubtitle}>拥有 {ownedCount}/{totalCount}</span>}
             </div>
             <div className={styles.ingredientList}>
               {currentRecipe.ingredients.map((ingredient, index) => (
-                <div key={index} className={`${styles.ingredientCard} ${ingredient.isOptional ? styles.optional : ''}`}>
+                <div 
+                  key={index} 
+                  className={`${styles.ingredientItem} ${ingredient.isOptional ? styles.optional : ''} ${ingredient.inUserInventory ? styles.owned : ''}`}
+                  onClick={() => handleToggleInventory(ingredient.id, !!ingredient.inUserInventory)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className={`${styles.ingredientCheck} ${ingredient.inUserInventory ? styles.checked : ''}`}>
-                    {ingredient.inUserInventory ? '✓' : ''}
+                    {ingredient.inUserInventory ? '✓' : '+'}
                   </div>
                   <div className={styles.ingredientInfo}>
                     <span className={styles.ingredientName}>
                       {ingredient.name}
-                      {ingredient.isOptional && <span className={styles.optionalLabel}>可选</span>}
+                      {ingredient.isOptional && <span className={styles.optionalBadge}>可选</span>}
                     </span>
                     <span className={styles.ingredientAmount}>
                       {ingredient.amount} {ingredient.unit}
@@ -258,64 +293,112 @@ export function RecipeDetailPage() {
           </div>
         )}
 
-        {/* 制作步骤 - 垂直时间轴 */}
+        {/* Steps - Horizontal Cards */}
         {hasSteps && (
           <div className={styles.section}>
             <h2 className={styles.sectionTitle}>制作步骤</h2>
-            <div className={styles.timeline}>
+            <div className={styles.stepsCarousel}>
               {currentRecipe.steps.map((step, index) => (
-                <div key={index} className={styles.timelineItem}>
-                  <div className={styles.timelineDot}>{step.stepNumber}</div>
-                  <div className={styles.timelineContent}>
-                    {step.title && <h3 className={styles.stepTitle}>{step.title}</h3>}
-                    <p className={styles.stepInstruction}>{step.instruction}</p>
-                    {step.duration && (
-                      <span className={styles.stepDuration}>
-                        <Clock size={12} /> {step.duration}秒
+                <div key={index} className={styles.stepCard}>
+                  <div className={styles.stepCardHeader}>
+                    <span className={styles.stepNumber}>Step {step.stepNumber}</span>
+                    {(step.duration && step.duration > 0) ? (
+                      <span className={styles.stepDurationCard}>
+                        <Clock size={12} /> {step.duration}s
                       </span>
-                    )}
+                    ) : null}
                   </div>
+                  {step.title && <h3 className={styles.stepTitleCard}>{step.title}</h3>}
+                  <p className={styles.stepInstructionCard}>{step.instruction}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* 其他信息 */}
-        {(currentRecipe.garnish || currentRecipe.iceType || currentRecipe.method || currentRecipe.origin) && (
+        {/* Pairing Showcase */}
+        {currentRecipe.pairing && (currentRecipe.pairing.food?.length > 0 || currentRecipe.pairing.music?.length > 0) && (
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>更多信息</h2>
-            <div className={styles.metaGrid}>
-              {currentRecipe.method && (
-                <div className={styles.metaCard}>
-                  <span className={styles.metaLabel}>调制法</span>
-                  <span className={styles.metaValue}>{currentRecipe.method}</span>
+            <h2 className={styles.sectionTitle}>灵魂搭配</h2>
+            <div className={styles.pairingGrid}>
+              {currentRecipe.pairing.food?.length > 0 && (
+                <div className={styles.pairingCard}>
+                  <div className={styles.pairingTitle}><Utensils size={14} /> 餐配</div>
+                  <div className={styles.pairingList}>
+                    {currentRecipe.pairing.food.map((f, i) => <span key={`food-${i}`} className={styles.pairingItem}>{f}</span>)}
+                  </div>
                 </div>
               )}
-              {currentRecipe.garnish && (
-                <div className={styles.metaCard}>
-                  <span className={styles.metaLabel}>装饰</span>
-                  <span className={styles.metaValue}>{currentRecipe.garnish}</span>
-                </div>
-              )}
-              {currentRecipe.iceType && (
-                <div className={styles.metaCard}>
-                  <span className={styles.metaLabel}>冰块</span>
-                  <span className={styles.metaValue}>{currentRecipe.iceType}</span>
-                </div>
-              )}
-              {currentRecipe.origin && (
-                <div className={styles.metaCard}>
-                  <span className={styles.metaLabel}>起源地</span>
-                  <span className={styles.metaValue}>{currentRecipe.origin}</span>
+              {currentRecipe.pairing.music?.length > 0 && (
+                <div className={styles.pairingCard}>
+                  <div className={styles.pairingTitle}><Music size={14} /> 歌单</div>
+                  <div className={styles.pairingList}>
+                    {currentRecipe.pairing.music.map((m, i) => <span key={`music-${i}`} className={styles.pairingItem}>{m}</span>)}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
+
+        {/* Variations */}
+        {currentRecipe.variations && currentRecipe.variations.length > 0 && (
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>探索变体</h2>
+            <div className={styles.variationsList}>
+              {currentRecipe.variations.map((v, i) => (
+                <div key={`var-${i}`} className={styles.variationItem}>{v}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meta Info */}
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>更多信息</h2>
+          <div className={styles.metaGrid}>
+            {currentRecipe.creator && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>创作者</span>
+                <span className={styles.metaValue}>{currentRecipe.creator}</span>
+              </div>
+            )}
+            {currentRecipe.yearCreated && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>年份</span>
+                <span className={styles.metaValue}>{currentRecipe.yearCreated}</span>
+              </div>
+            )}
+            {currentRecipe.method && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>调制法</span>
+                <span className={styles.metaValue}>{currentRecipe.method}</span>
+              </div>
+            )}
+            {currentRecipe.iceType && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>冰块</span>
+                <span className={styles.metaValue}>{currentRecipe.iceType}</span>
+              </div>
+            )}
+            {currentRecipe.garnish && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>装饰</span>
+                <span className={styles.metaValue}>{currentRecipe.garnish}</span>
+              </div>
+            )}
+            {currentRecipe.origin && (
+              <div className={styles.metaCard}>
+                <span className={styles.metaLabel}>起源地</span>
+                <span className={styles.metaValue}>{currentRecipe.origin}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
-      {/* 删除确认对话框 */}
+      {/* Delete Modal */}
       {showDeleteConfirm && (
         <div className={styles.modalOverlay} onClick={() => setShowDeleteConfirm(false)}>
           <div className={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
@@ -326,18 +409,8 @@ export function RecipeDetailPage() {
               <strong>此操作无法撤销</strong>
             </p>
             <div className={styles.confirmActions}>
-              <button 
-                className={styles.confirmCancel}
-                onClick={() => setShowDeleteConfirm(false)}
-              >
-                取消
-              </button>
-              <button 
-                className={styles.confirmDelete}
-                onClick={handleDelete}
-              >
-                删除
-              </button>
+              <button className={styles.confirmCancel} onClick={() => setShowDeleteConfirm(false)}>取消</button>
+              <button className={styles.confirmDelete} onClick={handleDelete}>删除</button>
             </div>
           </div>
         </div>

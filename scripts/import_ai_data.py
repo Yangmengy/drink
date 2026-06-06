@@ -85,9 +85,37 @@ def import_data(json_file, db_path=None):
             current_time
         ))
         
-        # Here we could also insert ingredients and steps if present in JSON
-        # For simplicity, just insert recipe main table.
-        
+        # Insert steps
+        steps = item.get('steps', [])
+        for step in steps:
+            step_id = str(uuid.uuid4())
+            cursor.execute('''
+                INSERT OR IGNORE INTO recipe_steps (id, recipe_id, step_number, instruction, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (step_id, recipe_id, step.get('step_number'), step.get('instruction'), current_time))
+            
+        # Insert ingredients
+        ingredients = item.get('ingredients', [])
+        for idx, ing in enumerate(ingredients):
+            ing_name = ing.get('name_zh')
+            # Look up ingredient by name
+            cursor.execute("SELECT id FROM ingredients WHERE name_zh = ?", (ing_name,))
+            row = cursor.fetchone()
+            if row:
+                ing_id = row[0]
+            else:
+                ing_id = "ing-" + str(uuid.uuid4())[:12]
+                cursor.execute('''
+                    INSERT INTO ingredients (id, name_zh, name_en, category, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (ing_id, ing_name, ing.get('name_en'), 'mixer', current_time, current_time))
+            
+            link_id = str(uuid.uuid4())
+            cursor.execute('''
+                INSERT OR IGNORE INTO recipe_ingredients (id, recipe_id, ingredient_id, amount, unit, is_optional, display_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (link_id, recipe_id, ing_id, ing.get('amount'), ing.get('unit'), 1 if ing.get('is_optional') else 0, idx + 1, current_time))
+            
     conn.commit()
     conn.close()
     print(f"Successfully imported {len(data)} recipes.")

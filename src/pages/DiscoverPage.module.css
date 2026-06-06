@@ -172,12 +172,29 @@
 }
 
 /* 交错动画延迟 */
-.stagger1 { animation-delay: 0ms; }
-.stagger2 { animation-delay: 60ms; }
-.stagger3 { animation-delay: 120ms; }
-.stagger4 { animation-delay: 180ms; }
-.stagger5 { animation-delay: 240ms; }
-.stagger6 { animation-delay: 300ms; }
+.stagger1 {
+  animation-delay: 0ms;
+}
+
+.stagger2 {
+  animation-delay: 60ms;
+}
+
+.stagger3 {
+  animation-delay: 120ms;
+}
+
+.stagger4 {
+  animation-delay: 180ms;
+}
+
+.stagger5 {
+  animation-delay: 240ms;
+}
+
+.stagger6 {
+  animation-delay: 300ms;
+}
 
 /* ========== 空状态 ========== */
 
@@ -205,4 +222,24 @@
 .emptyText {
   font-size: var(--font-size-subhead);
   color: var(--text-quaternary);
+}
+
+/* ========== 高级筛选 ========== */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.filterTag {
+  padding: 3px 6px !important;
+  font-size: 10px !important;
 }
