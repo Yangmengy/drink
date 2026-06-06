@@ -1,0 +1,101 @@
+{
+  "title": "AI Generated Cocktail Data Schema",
+  "description": "用于AI生成鸡尾酒数据的JSON Schema规范",
+  "type": "object",
+  "required": ["id", "name_zh", "name_en", "category", "ingredients", "steps", "image_url"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "唯一标识符",
+      "example": "mojito-001"
+    },
+    "name_zh": {
+      "type": "string",
+      "description": "中文名称"
+    },
+    "name_en": {
+      "type": "string",
+      "description": "英文名称"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["classic", "contemporary", "tropical", "short", "long", "mocktail"]
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "标签数组"
+    },
+    "description": {
+      "type": "string",
+      "description": "简短描述50-200字"
+    },
+    "story": {
+      "type": "string",
+      "description": "背景故事200-1000字"
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name_zh": {"type": "string"},
+          "name_en": {"type": "string"},
+          "amount": {"type": "number"},
+          "unit": {"type": "string"},
+          "is_optional": {"type": "boolean"},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step_number": {"type": "integer"},
+          "title": {"type": "string"},
+          "instruction": {"type": "string"},
+          "duration": {"type": "integer"}
+        }
+      }
+    },
+    "method": {
+      "type": "string",
+      "enum": ["shake", "stir", "build", "blend"]
+    },
+    "glass_type": {
+      "type": "string"
+    },
+    "ice_type": {
+      "type": "string"
+    },
+    "garnish": {
+      "type": "string"
+    },
+    "difficulty": {
+      "type": "integer"
+    },
+    "abv": {
+      "type": "number"
+    },
+    "prep_time": {
+      "type": "integer"
+    },
+    "flavor_profile": {
+      "type": "object",
+      "properties": {
+        "sweet": {"type": "integer"},
+        "sour": {"type": "integer"},
+        "bitter": {"type": "integer"},
+        "strong": {"type": "integer"}
+      }
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    }
+  }
+}

@@ -10,6 +10,19 @@ CREATE TABLE IF NOT EXISTS recipes (
     name_en TEXT,
     category TEXT NOT NULL,
     description TEXT,
+    story TEXT,
+    method TEXT,
+    color TEXT,
+    tags TEXT,
+    flavor_profile TEXT,
+    occasion TEXT,
+    season TEXT,
+    mood TEXT,
+    origin TEXT,
+    year_created INTEGER,
+    creator TEXT,
+    variations TEXT,
+    pairing TEXT,
     image_url TEXT,
     glass_type TEXT,
     ice_type TEXT,
@@ -122,6 +135,29 @@ CREATE TABLE IF NOT EXISTS history (
 );
 
 -- ============================================
+-- 9. 待做清单表 (todo_list)
+-- ============================================
+CREATE TABLE IF NOT EXISTS todo_list (
+    id TEXT PRIMARY KEY,
+    recipe_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+);
+
+-- ============================================
+-- 10. 饮酒记录表 (drink_logs)
+-- ============================================
+CREATE TABLE IF NOT EXISTS drink_logs (
+    id TEXT PRIMARY KEY,
+    recipe_id TEXT NOT NULL,
+    date_str TEXT NOT NULL,
+    rating INTEGER,
+    notes TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+);
+
+-- ============================================
 -- 索引 (Indexes)
 -- ============================================
 
@@ -148,6 +184,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorites(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_history_recipe_id ON history(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_history_viewed_at ON history(viewed_at DESC);
 
+-- 待做与记录索引
+CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_list_recipe_id ON todo_list(recipe_id);
+CREATE INDEX IF NOT EXISTS idx_drink_logs_date_str ON drink_logs(date_str);
+CREATE INDEX IF NOT EXISTS idx_drink_logs_recipe_id ON drink_logs(recipe_id);
+
 -- ============================================
 -- FTS5 全文搜索 (Full-Text Search)
 -- ============================================
@@ -159,6 +200,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
     name_en,
     category,
     description,
+    story,
     ingredients,
     tokenize = 'porter unicode61'
 );
@@ -166,8 +208,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
 -- 触发器：插入时同步到 FTS
 CREATE TRIGGER IF NOT EXISTS recipes_fts_insert AFTER INSERT ON recipes
 BEGIN
-    INSERT INTO recipes_fts(recipe_id, name_zh, name_en, category, description)
-    VALUES (NEW.id, NEW.name_zh, NEW.name_en, NEW.category, NEW.description);
+    INSERT INTO recipes_fts(recipe_id, name_zh, name_en, category, description, story)
+    VALUES (NEW.id, NEW.name_zh, NEW.name_en, NEW.category, NEW.description, NEW.story);
 END;
 
 -- 触发器：更新时同步到 FTS
@@ -177,7 +219,8 @@ BEGIN
     SET name_zh = NEW.name_zh,
         name_en = NEW.name_en,
         category = NEW.category,
-        description = NEW.description
+        description = NEW.description,
+        story = NEW.story
     WHERE recipe_id = NEW.id;
 END;
 

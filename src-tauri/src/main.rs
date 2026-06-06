@@ -45,6 +45,19 @@ async fn main() {
             get_ingredients_by_category,
             search_ingredients,
             get_recipes_by_inventory,
+            
+            // 图片相关命令
+            get_image_url,
+            
+            // 待做相关命令
+            get_todos,
+            add_todo,
+            remove_todo,
+            is_todo,
+            
+            // 记录相关命令
+            get_drink_logs,
+            add_drink_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

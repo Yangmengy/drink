@@ -1,57 +1,56 @@
-.searchBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-search);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  transition: all var(--duration-normal) var(--ease-out);
+.wrapper {
+  position: relative;
+  width: 100%;
 }
 
-.searchBar.focused {
+.inputGroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--bg-search);
+  border: 1px solid transparent;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all var(--duration-fast) var(--ease-out);
+  overflow: hidden;
+}
+
+.inputGroup:focus-within {
   background: var(--bg-elevated);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-light);
 }
 
 .icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-tertiary);
-  flex-shrink: 0;
+  pointer-events: none;
+  width: 16px;
+  height: 16px;
 }
 
 .input {
-  flex: 1;
-  background: transparent;
+  width: 100%;
+  height: 100%;
+  padding: 0 14px 0 36px;
   border: none;
-  outline: none;
-  font-size: var(--font-size-body);
+  background: transparent;
   font-family: var(--font-family-base);
+  font-size: var(--font-size-subhead);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
-  letter-spacing: -0.022em;
+  outline: none;
 }
 
 .input::placeholder {
   color: var(--text-quaternary);
 }
 
-.clearBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(60, 60, 67, 0.16);
-  border: none;
-  border-radius: var(--radius-full);
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  color: var(--text-secondary);
-  transition: all var(--duration-fast) var(--ease-out);
-  flex-shrink: 0;
+.input[readonly] {
   cursor: pointer;
-}
-
-.clearBtn:active {
-  transform: scale(0.88);
-  background: rgba(60, 60, 67, 0.22);
 }

@@ -1,0 +1,251 @@
+/* ========== 页面容器 ========== */
+.page {
+  min-height: 100vh;
+  background: var(--color-bg-primary);
+  padding-bottom: 32px;
+}
+
+.loading, .error {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100vh; gap: 16px; color: var(--color-text-secondary);
+}
+
+.backButton {
+  padding: 10px 24px; border-radius: 99px; background: var(--color-accent); color: white; border: none; font-weight: 500; cursor: pointer;
+}
+
+/* ========== 沉浸式顶部导航 ========== */
+.header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+}
+
+.navButton {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(0,0,0,0.2); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1); color: white;
+  cursor: pointer; transition: all 0.2s;
+}
+
+.navButton:hover { background: rgba(0,0,0,0.4); }
+.navButton.favorited { color: #ff4757; }
+.navButton.todoActive { color: #4ECDC4; }
+
+.navActions { display: flex; gap: 12px; }
+
+/* ========== Hero 区域 ========== */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 45vh;
+  min-height: 350px;
+  background: #1a1a1a;
+  overflow: hidden;
+}
+
+.heroImage {
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.heroPlaceholder {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 80px;
+}
+
+.heroOverlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 40px 20px 30px;
+  background: linear-gradient(to top, var(--color-bg-primary) 0%, rgba(255,255,255,0) 100%);
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+
+.heroTitles {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.heroNameZh {
+  font-size: 28px; font-weight: 800; color: var(--color-text-primary); margin: 0; line-height: 1.2;
+}
+
+.heroNameEn {
+  font-size: 16px; font-weight: 500; color: var(--color-text-secondary); opacity: 0.8;
+}
+
+.heroCategory {
+  padding: 6px 14px; border-radius: 99px;
+  background: var(--color-accent); color: white;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 12px rgba(78,205,196,0.3);
+}
+
+/* ========== 内容区域 ========== */
+.content {
+  padding: 0 20px;
+  position: relative;
+  z-index: 10;
+}
+
+/* ========== 拟物信息卡片 ========== */
+.infoCard {
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 20px 16px;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+  margin-top: -24px;
+  margin-bottom: 32px;
+}
+
+.infoItem {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+
+.infoIcon { font-size: 20px; }
+.infoIconText { color: var(--color-accent); }
+
+.infoLabel {
+  font-size: 12px; color: var(--color-text-tertiary); font-weight: 500;
+}
+
+.infoValue, .infoDots {
+  font-size: 15px; font-weight: 700; color: var(--color-text-primary);
+}
+
+.infoDots { color: var(--color-accent); letter-spacing: 2px; }
+
+.infoDivider {
+  width: 1px; height: 32px; background: rgba(0,0,0,0.06);
+}
+
+/* ========== 故事杂志风 ========== */
+.storyBlock {
+  position: relative;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(78,205,196,0.1), rgba(255,255,255,0.5));
+  border-radius: 20px;
+  margin-bottom: 32px;
+  border-left: 4px solid var(--color-accent);
+}
+
+.storyQuoteIcon {
+  position: absolute; top: 10px; left: 16px; font-size: 60px; line-height: 1;
+  color: rgba(78,205,196,0.2); font-family: serif; font-weight: bold;
+}
+
+.storyText {
+  position: relative; z-index: 1; font-size: 15px; line-height: 1.8;
+  color: var(--color-text-secondary); font-style: italic; margin: 0;
+}
+
+/* ========== 通用标题 ========== */
+.section { margin-bottom: 32px; }
+.sectionHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.sectionTitle { font-size: 20px; font-weight: 700; color: var(--color-text-primary); margin: 0 0 16px 0; }
+
+/* ========== 风味雷达/进度条 ========== */
+.flavorBars {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px; background: white; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+
+.flavorRow {
+  display: flex; align-items: center; gap: 12px;
+}
+
+.flavorLabel {
+  width: 80px; font-size: 14px; font-weight: 600; color: var(--color-text-secondary);
+}
+
+.flavorTrack {
+  flex: 1; height: 10px; background: rgba(0,0,0,0.04); border-radius: 99px; overflow: hidden;
+}
+
+.flavorFill {
+  height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== 描述与标签 ========== */
+.description { font-size: 15px; line-height: 1.6; color: var(--color-text-secondary); margin-bottom: 16px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
+.tag { padding: 6px 14px; background: white; border: 1px solid var(--color-border); border-radius: 99px; font-size: 13px; font-weight: 500; color: var(--color-text-secondary); }
+
+/* ========== 原料 Checklist ========== */
+.ingredientCount { font-size: 14px; color: var(--color-accent); font-weight: 600; }
+.ingredientList { display: flex; flex-direction: column; gap: 12px; }
+
+.ingredientCard {
+  display: flex; align-items: center; gap: 16px; padding: 16px;
+  background: white; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+  border: 1px solid transparent; transition: all 0.2s;
+}
+
+.ingredientCard:hover { border-color: var(--color-accent); transform: translateY(-2px); }
+.ingredientCard.optional { opacity: 0.8; }
+
+.ingredientCheck {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--color-border);
+  display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: bold;
+}
+.ingredientCheck.checked { background: var(--color-accent); border-color: var(--color-accent); }
+
+.ingredientInfo { flex: 1; display: flex; justify-content: space-between; align-items: center; }
+.ingredientName { font-size: 16px; font-weight: 600; color: var(--color-text-primary); }
+.optionalLabel { margin-left: 8px; font-size: 12px; padding: 2px 6px; background: var(--color-bg-secondary); border-radius: 4px; color: var(--color-text-tertiary); font-weight: normal; }
+.ingredientAmount { font-size: 15px; font-weight: 500; color: var(--color-text-secondary); }
+
+/* ========== 时间轴制作步骤 ========== */
+.timeline {
+  display: flex; flex-direction: column; gap: 0; padding-left: 12px;
+}
+
+.timelineItem {
+  position: relative; padding-left: 32px; padding-bottom: 32px;
+}
+
+.timelineItem:last-child { padding-bottom: 0; }
+
+.timelineItem::before {
+  content: ''; position: absolute; left: 16px; top: 32px; bottom: 0; width: 2px;
+  background: var(--color-border);
+}
+.timelineItem:last-child::before { display: none; }
+
+.timelineDot {
+  position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--color-accent); color: white; display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 14px; z-index: 2; box-shadow: 0 0 0 4px var(--color-bg-primary);
+}
+
+.timelineContent {
+  background: white; padding: 16px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+}
+
+.stepTitle { font-size: 16px; font-weight: 600; margin: 0 0 8px 0; color: var(--color-text-primary); }
+.stepInstruction { font-size: 15px; line-height: 1.6; color: var(--color-text-secondary); margin: 0; }
+.stepDuration { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; color: var(--color-accent); font-weight: 500; background: rgba(78,205,196,0.1); padding: 4px 10px; border-radius: 99px; }
+
+/* ========== 更多信息 网格 ========== */
+.metaGrid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+.metaCard {
+  background: white; padding: 16px; border-radius: 16px;
+  display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+}
+
+.metaLabel { font-size: 13px; color: var(--color-text-tertiary); font-weight: 500; }
+.metaValue { font-size: 15px; font-weight: 600; color: var(--color-text-primary); }
+
+@media (min-width: 768px) {
+  .content { max-width: 800px; margin-left: auto; margin-right: auto; }
+}

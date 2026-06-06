@@ -10,8 +10,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 1420,
-    strictPort: true,
+    port: 5173,
+    strictPort: false,
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {

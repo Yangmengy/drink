@@ -1,4 +1,84 @@
-// 配方类型定义
+// ===== Display Recipe (from API / frontend view) =====
+
+export interface DisplayIngredient {
+  name: string;
+  amount: string;
+}
+
+export interface FlavorProfile {
+  sweet: number;
+  sour: number;
+  bitter: number;
+  strong: number;
+}
+
+export interface Pairing {
+  food: string[];
+  music: string[];
+}
+
+export interface Recipe {
+  id: string;
+  nameZh: string;
+  nameEn: string;
+  image: string | null;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  abv: number | null;
+  glass: string;
+  glassIcon: string;
+  category: string;
+  tags: string[];
+  ingredients: DisplayIngredient[];
+  instructions: string;
+  story: string;
+  rating: number;
+}
+
+// 详情页专用类型
+export interface RecipeDetailIngredient {
+  name: string;
+  amount: number;
+  unit: string;
+  isOptional: boolean;
+  inUserInventory?: boolean; // 用户是否拥有该原料
+}
+
+export interface RecipeDetailStep {
+  stepNumber: number;
+  title: string | null;
+  instruction: string;
+  duration: number | null;
+}
+
+export interface RecipeDetail {
+  id: string;
+  nameZh: string;
+  nameEn: string;
+  image: string | null;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  abv: number | null;
+  glass: string;
+  glassIcon: string;
+  category: string;
+  tags: string[];
+  description: string;
+  story: string;
+  method: string | null;
+  garnish: string | null;
+  iceType: string | null;
+  flavorProfile: FlavorProfile | null;
+  occasion: string[];
+  season: string[];
+  origin: string | null;
+  yearCreated: number | null;
+  prepTime: number | null;
+  ingredients: RecipeDetailIngredient[];
+  steps: RecipeDetailStep[];
+  isFavorite: boolean;
+  viewCount: number;
+}
+
+// ===== Database Recipe (SQLite schema, for later) =====
 
 export type RecipeCategory = 
   | 'classic' 
@@ -25,25 +105,54 @@ export interface RecipeIngredient {
   note: string | null;
 }
 
-export interface Recipe {
+export interface DBRecipe {
   id: string;
   name_zh: string;
   name_en: string | null;
   category: RecipeCategory;
-  glass_type: string;
-  method: MakeMethod;
-  difficulty: number;
-  abv: number | null;
-  description: string;
+  description: string | null;
   story: string | null;
+  method: string | null;
+  color: string | null;
+  tags: string[] | null;
+  flavor_profile: FlavorProfile | null;
+  occasion: string[] | null;
+  season: string[] | null;
+  mood: string[] | null;
+  origin: string | null;
+  year_created: number | null;
+  creator: string | null;
+  variations: string[] | null;
+  pairing: Pairing | null;
   image_url: string | null;
-  steps: RecipeStep[];
-  ingredients: RecipeIngredient[];
-  created_at: string;
-  updated_at: string;
+  glass_type: string | null;
+  ice_type: string | null;
+  garnish: string | null;
+  abv: number | null;
+  difficulty: number;
+  prep_time: number | null;
+  source: string | null;
+  is_iba: boolean;
+  is_favorite: boolean;
+  view_count: number;
+  last_viewed_at: number | null;
+  created_at: number;
+  updated_at: number;
+  synced_at: number | null;
 }
 
-// 原料类型定义
+export interface DBRecipeDetail {
+  recipe: DBRecipe;
+  ingredients: DBRecipeIngredientDetail[];
+  steps: RecipeStep[];
+}
+
+export interface DBRecipeIngredientDetail {
+  recipe_ingredient: RecipeIngredient;
+  ingredient: Ingredient;
+}
+
+// ===== Ingredient =====
 
 export type IngredientCategory = 
   | 'spirit' 
@@ -73,7 +182,7 @@ export interface InventoryItem {
   updated_at: string;
 }
 
-// 搜索相关
+// ===== Search =====
 
 export interface SearchRecipesArgs {
   query?: string;
@@ -90,14 +199,33 @@ export interface RecipeFilters {
   owned_only?: boolean;
 }
 
-// 类型别名，用于 API 层
 export type RecipeFilter = RecipeFilters;
 
-// 推荐相关
+// ===== Recommendations =====
 
 export interface RecommendedRecipe {
   recipe: Recipe;
   match_score: number;
   missing_ingredients: string[];
   reason: string;
+}
+
+// ===== Todo & DrinkLog =====
+export interface TodoItem {
+  id: string;
+  recipe_id: string;
+  created_at: number;
+  recipe: DBRecipe;
+  owned_ingredients: number;
+  total_ingredients: number;
+}
+
+export interface DrinkLog {
+  id: string;
+  recipe_id: string;
+  date_str: string;
+  rating: number | null;
+  notes: string | null;
+  created_at: number;
+  recipe: DBRecipe | null;
 }

@@ -2,88 +2,84 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
+  padding: 8px var(--content-padding) 12px;
+  padding-top: calc(8px + var(--safe-area-top));
+  background: #FFFFFF;
+}
+
+.navbarContent {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 12px 20px;
-  padding-top: calc(var(--safe-area-top) + 12px);
-  background: var(--bg-glass-heavy);
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
 }
 
-.left {
+.titleGroup {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.backBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  margin-left: -8px;
-  color: var(--color-primary);
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-
-.backBtn:active {
-  transform: scale(0.88);
-}
-
-.title {
+.appName {
+  font-family: var(--font-family-base);
   font-size: var(--font-size-large-title);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  letter-spacing: -0.024em;
+  letter-spacing: 0;
+  line-height: 1.15;
 }
 
-.largeTitle {
-  font-size: var(--font-size-large-title);
+.subtitle {
+  font-size: var(--font-size-caption1);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.title1 {
-  font-size: var(--font-size-title2);
-}
-
-.right {
+.actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
+  padding-top: 4px;
 }
 
 .iconBtn {
   position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  color: var(--text-primary);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
   transition: all var(--duration-fast) var(--ease-out);
 }
 
 .iconBtn:active {
-  transform: scale(0.88);
-  background: var(--bg-search);
+  transform: scale(0.92);
+  background: var(--bg-elevated);
 }
 
-.badge {
+.notificationDot {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: var(--color-error);
-  color: white;
-  font-size: var(--font-size-caption2);
-  font-weight: var(--font-weight-semibold);
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-rose-icon);
+  border: 2px solid var(--bg-secondary);
+}
+
+/* 紧凑模式（滚动后） */
+.navbar.compact .appName {
+  font-size: var(--font-size-title3);
+}
+
+.navbar.compact .subtitle {
+  display: none;
 }

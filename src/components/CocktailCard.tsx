@@ -1,10 +1,16 @@
-import { Heart, Flame, Clock } from 'lucide-react';
-import { Recipe } from '@/types';
-import { getDifficultyText } from '@/utils/format';
+import { Heart } from 'lucide-react';
+import type { Recipe } from '@/types';
 import styles from './CocktailCard.module.css';
+
+const DIFFICULTY_DOTS: Record<string, number> = {
+  Easy: 1,
+  Medium: 3,
+  Hard: 5,
+};
 
 interface CocktailCardProps {
   recipe: Recipe;
+  variant?: 'grid' | 'recommend';
   isFavorite?: boolean;
   onFavoriteToggle?: () => void;
   onClick?: () => void;
@@ -13,64 +19,100 @@ interface CocktailCardProps {
 
 export function CocktailCard({
   recipe,
+  variant = 'grid',
   isFavorite = false,
   onFavoriteToggle,
   onClick,
   style,
 }: CocktailCardProps) {
-  const totalTime = recipe.steps.reduce((sum, s) => sum + s.duration_sec, 0);
-  const timeText = totalTime > 0 ? `${Math.ceil(totalTime / 60)}min` : null;
+  const dotCount = DIFFICULTY_DOTS[recipe.difficulty] ?? 3;
 
-  return (
-    <div className={styles.card} onClick={onClick} style={style}>
-      <div className={styles.imageSection}>
-        {recipe.image_url ? (
-          <img src={recipe.image_url} alt={recipe.name_zh} className={styles.image} loading="lazy" />
-        ) : (
-          <div className={styles.imagePlaceholder}>🍸</div>
-        )}
-        <div className={styles.gradientOverlay} />
-        <div className={styles.imageLabel}>
-          <span className={styles.imageNameZh}>{recipe.name_zh}</span>
-          {recipe.name_en && (
-            <span className={styles.imageNameEn}>{recipe.name_en}</span>
-          )}
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.style.display = 'none';
+    const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+    if (fallback) fallback.style.display = 'flex';
+  };
+
+  if (variant === 'recommend') {
+    return (
+      <div className={styles.recommendCard} onClick={onClick} style={style}>
+        <div className={styles.recommendImage}>
+          {recipe.image ? (
+            <img
+              src={recipe.image}
+              alt={recipe.nameEn}
+              className={styles.recipeImg}
+              loading="lazy"
+              onError={handleImgError}
+            />
+          ) : null}
+          <div
+            className={styles.imagePlaceholder}
+            style={{ display: recipe.image ? 'none' : 'flex' }}
+          >
+            🍸
+          </div>
+          <div className={styles.imageOverlay}>
+            <span className={styles.recommendAbv}>
+              {recipe.abv != null ? `${recipe.abv}%` : ''}
+            </span>
+          </div>
         </div>
+        <div className={styles.recommendInfo}>
+          <span className={styles.recommendName}>{recipe.nameZh}</span>
+          <span className={styles.recommendSub}>{recipe.glass}</span>
+        </div>
+      </div>
+    );
+  }
 
+  // grid variant
+  return (
+    <div className={styles.gridCard} onClick={onClick} style={style}>
+      <div className={styles.gridImage}>
+        {recipe.image ? (
+          <img
+            src={recipe.image}
+            alt={recipe.nameEn}
+            className={styles.recipeImg}
+            loading="lazy"
+            onError={handleImgError}
+          />
+        ) : null}
+        <div
+          className={styles.gridImagePlaceholder}
+          style={{ display: recipe.image ? 'none' : 'flex' }}
+        >
+          {recipe.glassIcon || '🍸'}
+        </div>
+        <div className={styles.gridOverlay} />
         <button
-          className={`${styles.favBtn} ${isFavorite ? styles.favBtnFavorited : ''}`}
+          className={`${styles.favBtn} ${isFavorite ? styles.favBtnActive : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onFavoriteToggle?.();
           }}
-          type="button"
         >
-          <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} strokeWidth={2} />
+          <Heart
+            size={14}
+            fill={isFavorite ? 'currentColor' : 'none'}
+            strokeWidth={2}
+          />
         </button>
       </div>
-
-      <div className={styles.infoRow}>
-        {recipe.abv != null && (
-          <>
-            <span className={styles.infoTag}>
-              <Flame size={13} strokeWidth={1.5} />
-              {recipe.abv}%
-            </span>
-            <span className={styles.divider} />
-          </>
-        )}
-        <span className={styles.infoTag}>
-          {getDifficultyText(recipe.difficulty)}
-        </span>
-        {timeText && (
-          <>
-            <span className={styles.divider} />
-            <span className={styles.infoTag}>
-              <Clock size={13} strokeWidth={1.5} />
-              {timeText}
-            </span>
-          </>
-        )}
+      <div className={styles.gridInfo}>
+        <span className={styles.gridName}>{recipe.nameZh || recipe.nameEn}</span>
+        <div className={styles.gridMeta}>
+          {recipe.abv != null && (
+            <span className={styles.gridAbv}>{recipe.abv}%</span>
+          )}
+          <span className={styles.gridDifficulty}>
+            {'●'.repeat(dotCount)}{'○'.repeat(5 - dotCount)}
+          </span>
+        </div>
+        <p className={styles.gridDesc}>
+          {recipe.ingredients.slice(0, 3).map((i) => i.name).join(' · ') || recipe.instructions.slice(0, 50)}
+        </p>
       </div>
     </div>
   );

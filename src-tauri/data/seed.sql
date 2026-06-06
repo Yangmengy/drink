@@ -52,7 +52,7 @@ INSERT OR IGNORE INTO ingredients VALUES
 -- ============================================
 
 -- Margarita (玛格丽特)
-INSERT OR IGNORE INTO recipes VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'margarita-classic',
     '玛格丽特',
     'Margarita',
@@ -76,7 +76,7 @@ INSERT OR IGNORE INTO recipes VALUES (
 );
 
 -- Mojito (莫吉托)
-INSERT OR IGNORE INTO recipes VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'mojito-classic',
     '莫吉托',
     'Mojito',
@@ -100,7 +100,7 @@ INSERT OR IGNORE INTO recipes VALUES (
 );
 
 -- White Russian (白俄罗斯)
-INSERT OR IGNORE INTO recipes VALUES (
+INSERT OR IGNORE INTO recipes (id, name_zh, name_en, category, description, image_url, glass_type, ice_type, garnish, abv, difficulty, prep_time, source, is_iba, is_favorite, view_count, last_viewed_at, created_at, updated_at, synced_at) VALUES (
     'white-russian',
     '白俄罗斯',
     'White Russian',

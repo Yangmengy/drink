@@ -1,4 +1,19 @@
 use serde::{Deserialize, Serialize};
+use sqlx::types::Json;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlavorProfile {
+    pub sweet: i32,
+    pub sour: i32,
+    pub bitter: i32,
+    pub strong: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Pairing {
+    pub food: Vec<String>,
+    pub music: Vec<String>,
+}
 
 /// 配方
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -8,6 +23,19 @@ pub struct Recipe {
     pub name_en: Option<String>,
     pub category: String,
     pub description: Option<String>,
+    pub story: Option<String>,
+    pub method: Option<String>,
+    pub color: Option<String>,
+    pub tags: Option<Json<Vec<String>>>,
+    pub flavor_profile: Option<Json<FlavorProfile>>,
+    pub occasion: Option<Json<Vec<String>>>,
+    pub season: Option<Json<Vec<String>>>,
+    pub mood: Option<Json<Vec<String>>>,
+    pub origin: Option<String>,
+    pub year_created: Option<i32>,
+    pub creator: Option<String>,
+    pub variations: Option<Json<Vec<String>>>,
+    pub pairing: Option<Json<Pairing>>,
     pub image_url: Option<String>,
     pub glass_type: Option<String>,
     pub ice_type: Option<String>,

@@ -1,29 +1,59 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { Navbar, SearchBar, Tag, SectionTitle, CocktailCard } from '@/components';
-import { mockRecipes } from '@/data/mockRecipes';
+import { useRecipeStore } from '@/stores/recipeStore';
+import type { Recipe } from '@/types';
 import styles from './DiscoverPage.module.css';
 
-const categories = [
-  { key: null, label: '全部' },
-  { key: 'classic', label: '经典' },
-  { key: 'contemporary', label: '当代' },
-  { key: 'tropical', label: '热带' },
-  { key: 'short', label: '短饮' },
-  { key: 'long', label: '长饮' },
-  { key: 'mocktail', label: '无酒精' },
-] as const;
+// 动态计算分类
+function useCategories(recipes: Recipe[]) {
+  return useMemo(() => {
+    const seen = new Set<string>();
+    const cats: { key: string | null; label: string }[] = [{ key: null, label: '全部' }];
+    for (const r of recipes) {
+      const cat = r.category;
+      if (cat && !seen.has(cat)) {
+        seen.add(cat);
+        cats.push({ key: cat, label: cat });
+      }
+    }
+    return cats;
+  }, [recipes]);
+}
 
 export function DiscoverPage() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { recipes, fetchRecipes } = useRecipeStore();
+
+  useEffect(() => {
+    // 页面加载时获取全部数据（受后端默认 LIMIT 控制）
+    fetchRecipes();
+  }, [fetchRecipes]);
+
+  const categories = useCategories(recipes);
 
   const filteredRecipes = useMemo(() => {
-    if (!selectedCategory) return mockRecipes;
-    return mockRecipes.filter((r) => r.category === selectedCategory);
-  }, [selectedCategory]);
+    let result = recipes;
+    if (selectedCategory) {
+      result = result.filter((r) => r.category === selectedCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.nameZh.toLowerCase().includes(q) ||
+          r.nameEn.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [recipes, selectedCategory, searchQuery]);
 
-  const featuredRecipes = mockRecipes.slice(0, 6);
+  const featuredRecipes = useMemo(() => recipes.slice(0, 8), [recipes]);
 
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => {
@@ -36,60 +66,71 @@ export function DiscoverPage() {
 
   return (
     <div className={styles.page}>
-      <Navbar title="Mixology" size="large" showBell showTheme />
+      {/* 顶部：大标题 + 通知 */}
+      <Navbar
+        title="Mixology"
+        subtitle=""
+        showNotifications
+        hasNotification
+      />
 
       <div className={styles.content}>
-        {/* 搜索栏 — 点击跳转搜索页 */}
+        {/* 搜索栏 */}
         <SearchBar
-          placeholder="搜索鸡尾酒、原料..."
-          readonly
+          placeholder="搜索鸡尾酒、原料、配方..."
+          value={searchQuery}
+          onChange={setSearchQuery}
           className={styles.searchBar}
         />
 
-        {/* Hero 推荐卡片 */}
-        <div className={styles.heroCard}>
-          <div className={styles.heroEmoji}>🍸</div>
-          <h2 className={styles.heroTitle}>今日灵感</h2>
-          <p className={styles.heroSubtitle}>
-            基于你的酒柜，发现 3 款可即刻调制的鸡尾酒
-          </p>
-          <span className={styles.heroAction}>
-            查看推荐 <ChevronRight size={16} strokeWidth={2} />
-          </span>
+        {/* “今日灵感”卡片 */}
+        <div
+          className={styles.inspirationCard}
+          onClick={() => console.log('Navigate to recommendations')}
+        >
+          <div className={styles.inspirationBody}>
+            <div className={styles.iconArea}>
+              <span className={styles.iconEmoji}>🍸</span>
+            </div>
+            <div className={styles.inspirationText}>
+              <h2 className={styles.inspirationTitle}>今日灵感</h2>
+              <p className={styles.inspirationDesc}>
+                基于你的酒柜，发现 3 款可即刻调制的鸡尾酒
+              </p>
+              <span className={styles.inspirationLink}>
+                查看推荐 <ChevronRight size={14} strokeWidth={2.5} />
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* 热门推荐 */}
         <div className={styles.section}>
-          <SectionTitle action="全部">热门推荐</SectionTitle>
+          <SectionTitle>热门推荐</SectionTitle>
           <div className={styles.recommendScroll}>
             {featuredRecipes.map((recipe) => (
-              <div
+              <CocktailCard
                 key={recipe.id}
-                className={styles.recommendCard}
-                onClick={() => console.log('View:', recipe.id)}
-              >
-                <span className={styles.recEmoji}>🍸</span>
-                <div className={styles.recInfo}>
-                  <span className={styles.recName}>{recipe.name_zh}</span>
-                  <span className={styles.recMeta}>
-                    {recipe.abv != null ? `${recipe.abv}%` : ''}
-                  </span>
-                </div>
-              </div>
+                recipe={recipe}
+                variant="recommend"
+                onClick={() => navigate(`/recipe/${recipe.id}`)}
+              />
             ))}
           </div>
         </div>
 
-        {/* 分类标签 */}
+        {/* 分类浏览 */}
         <div className={styles.section}>
           <SectionTitle>分类浏览</SectionTitle>
-          <div className={styles.categoryRow}>
+          <div className={styles.categoryScroll}>
             {categories.map((cat) => (
               <Tag
                 key={cat.label}
                 selected={selectedCategory === cat.key}
                 onClick={() =>
-                  setSelectedCategory(selectedCategory === cat.key ? null : cat.key)
+                  setSelectedCategory(
+                    selectedCategory === cat.key ? null : cat.key
+                  )
                 }
               >
                 {cat.label}
@@ -105,17 +146,23 @@ export function DiscoverPage() {
               <CocktailCard
                 key={recipe.id}
                 recipe={recipe}
+                variant="grid"
                 isFavorite={favorites.has(recipe.id)}
                 onFavoriteToggle={() => toggleFavorite(recipe.id)}
-                onClick={() => console.log('View recipe:', recipe.id)}
-                style={{ animationDelay: `${index * 50}ms` }}
+                onClick={() => navigate(`/recipe/${recipe.id}`)}
+                style={{
+                  animationDelay: `${index * 60}ms`,
+                  animation: `fadeIn var(--duration-normal) var(--ease-out) forwards`,
+                  opacity: 0,
+                }}
               />
             ))}
           </div>
         ) : (
           <div className={styles.emptyState}>
-            <span className={styles.emptyEmoji}>🔍</span>
-            <span className={styles.emptyText}>该分类暂无配方</span>
+            <span className={styles.emptyEmoji}>🍸</span>
+            <span className={styles.emptyTitle}>暂无匹配配方</span>
+            <span className={styles.emptyText}>试试其他分类或关键词</span>
           </div>
         )}
       </div>

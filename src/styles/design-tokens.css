@@ -1,61 +1,63 @@
 /**
- * 调酒 App - iOS 极简设计 Token
- * 灵感：Apple Human Interface Guidelines + 小红书
+ * Mixology — iOS 毛玻璃设计令牌
+ * 灵感：Apple HIG + 高级酒吧氛围
+ * 品牌色：柔和青色 #4ECDC4 / 柔和粉色 #FF6B6B
  */
 
 :root {
-  /* ========== 色彩 — 极简灰度系 ========== */
+  /* ========== 品牌色 ========== */
 
-  /* 交互蓝（唯一彩色，仅用于可点击元素） */
-  --color-primary: #0A84FF;
-  --color-primary-hover: #409CFF;
+  --color-accent: #4ECDC4;
+  --color-accent-hover: #3DBDB5;
+  --color-accent-light: rgba(78, 205, 196, 0.12);
+  --color-rose: #FF6B6B;
+  --color-rose-light: rgba(255, 107, 107, 0.1);
+  --color-rose-icon: #FF6B6B;
 
-  /* 功能色 — 极度克制 */
+  /* 功能色 */
   --color-success: #30D158;
   --color-error: #FF453A;
   --color-warning: #FF9F0A;
 
-  /* 背景 — iOS 系统色 */
-  --bg-primary: #F2F2F7;
-  --bg-secondary: #FFFFFF;
-  --bg-elevated: rgba(255, 255, 255, 0.72);
-  --bg-glass: rgba(255, 255, 255, 0.64);
-  --bg-glass-heavy: rgba(255, 255, 255, 0.82);
-  --bg-search: rgba(118, 118, 128, 0.12);
+  /* ========== 文字 — 暖深灰 ========== */
 
-  /* 文字 — iOS 色彩 */
-  --text-primary: #1C1C1E;
-  --text-secondary: #6E6E73;
-  --text-tertiary: #AEAEB2;
-  --text-quaternary: #C7C7CC;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-quaternary: #BBBBBB;
   --text-inverse: #FFFFFF;
 
-  /* 分割线 & 描边 */
-  --divider: rgba(60, 60, 67, 0.09);
-  --border-thin: rgba(0, 0, 0, 0.04);
-  --border-glass: rgba(255, 255, 255, 0.2);
+  /* ========== 背景 ========== */
 
-  /* ========== 字体 — Apple 原生 ========== */
+  --bg-root: #F5F2EF;
+  --bg-primary: #F5F2EF;
+  --bg-secondary: #FFFFFF;
+  --bg-elevated: rgba(255, 255, 255, 0.78);
+  --bg-glass: rgba(255, 255, 255, 0.64);
+  --bg-glass-heavy: rgba(255, 255, 255, 0.88);
+  --bg-search: rgba(0, 0, 0, 0.04);
 
-  --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-    "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
-  --font-family-mono: "SF Mono", "Menlo", "Monaco", monospace;
-  --font-family-rounded: "SF Pro Rounded", -apple-system, sans-serif;
+  /* ========== 分割线 ========== */
 
-  /* 字号 */
-  --font-size-large-title: 34px;
-  --font-size-title1: 28px;
-  --font-size-title2: 22px;
-  --font-size-title3: 20px;
-  --font-size-headline: 17px;
-  --font-size-body: 17px;
-  --font-size-callout: 16px;
-  --font-size-subhead: 15px;
-  --font-size-footnote: 13px;
-  --font-size-caption1: 12px;
-  --font-size-caption2: 11px;
+  --divider: rgba(0, 0, 0, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.35);
 
-  /* 字重 */
+  /* ========== 字体 ========== */
+
+  --font-family-base: "Times New Roman", "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+  --font-family-mono: "SF Mono", "Menlo", "Consolas", monospace;
+
+  --font-size-large-title: 28px;
+  --font-size-title1: 24px;
+  --font-size-title2: 20px;
+  --font-size-title3: 18px;
+  --font-size-headline: 16px;
+  --font-size-body: 14px;
+  --font-size-subhead: 13px;
+  --font-size-footnote: 12px;
+  --font-size-caption1: 11px;
+  --font-size-caption2: 10px;
+
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -63,37 +65,37 @@
 
   /* ========== 间距 — 4pt Grid ========== */
 
-  --spacing-xxs: 4px;
-  --spacing-xs: 8px;
-  --spacing-sm: 12px;
-  --spacing-md: 16px;
-  --spacing-lg: 20px;
-  --spacing-xl: 24px;
-  --spacing-xxl: 32px;
-  --spacing-xxxl: 48px;
+  --spacing-xxs: 3px;
+  --spacing-xs: 6px;
+  --spacing-sm: 10px;
+  --spacing-md: 14px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 26px;
+  --spacing-xxxl: 40px;
 
   /* ========== 圆角 ========== */
 
-  --radius-xs: 8px;
   --radius-sm: 10px;
-  --radius-md: 13px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-xxl: 24px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-xxl: 26px;
   --radius-full: 9999px;
 
-  /* ========== 阴影 — 极轻柔 ========== */
+  /* ========== 阴影 — 柔和散布 ========== */
 
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.1);
+  --shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 18px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 6px 24px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 10px 36px rgba(0, 0, 0, 0.1);
 
   /* ========== 动画 ========== */
 
   --duration-instant: 100ms;
   --duration-fast: 200ms;
-  --duration-normal: 300ms;
+  --duration-normal: 350ms;
   --duration-slow: 500ms;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -112,9 +114,6 @@
 
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
-  --safe-area-right: env(safe-area-inset-right, 0px);
-
   --content-padding: 16px;
 }
 
@@ -122,68 +121,83 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-primary: #000000;
+    --bg-root: #0D0D0F;
+    --bg-primary: #0D0D0F;
     --bg-secondary: #1C1C1E;
-    --bg-elevated: rgba(44, 44, 46, 0.72);
-    --bg-glass: rgba(44, 44, 46, 0.64);
-    --bg-glass-heavy: rgba(28, 28, 30, 0.82);
-    --bg-search: rgba(118, 118, 128, 0.24);
+    --bg-elevated: rgba(28, 28, 30, 0.82);
+    --bg-glass: rgba(28, 28, 30, 0.64);
+    --bg-glass-heavy: rgba(18, 18, 20, 0.90);
+    --bg-search: rgba(255, 255, 255, 0.08);
 
-    --text-primary: #F5F5F7;
+    --text-primary: #F0F0F2;
     --text-secondary: #98989D;
-    --text-tertiary: #636368;
-    --text-quaternary: #48484C;
-    --text-inverse: #000000;
+    --text-tertiary: #636366;
+    --text-quaternary: #48484A;
+    --text-inverse: #0D0D0F;
 
-    --divider: rgba(84, 84, 88, 0.32);
-    --border-thin: rgba(255, 255, 255, 0.06);
-    --border-glass: rgba(255, 255, 255, 0.08);
+    --divider: rgba(255, 255, 255, 0.06);
+    --border-glass: rgba(255, 255, 255, 0.1);
 
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+    --shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
+
+    --color-accent-light: rgba(78, 205, 196, 0.15);
+    --color-rose-light: rgba(255, 107, 107, 0.12);
   }
 }
 
 [data-theme="dark"] {
-  --bg-primary: #000000;
+  --bg-root: #0D0D0F;
+  --bg-primary: #0D0D0F;
   --bg-secondary: #1C1C1E;
-  --bg-elevated: rgba(44, 44, 46, 0.72);
-  --bg-glass: rgba(44, 44, 46, 0.64);
-  --bg-glass-heavy: rgba(28, 28, 30, 0.82);
-  --bg-search: rgba(118, 118, 128, 0.24);
+  --bg-elevated: rgba(28, 28, 30, 0.82);
+  --bg-glass: rgba(28, 28, 30, 0.64);
+  --bg-glass-heavy: rgba(18, 18, 20, 0.90);
+  --bg-search: rgba(255, 255, 255, 0.08);
 
-  --text-primary: #F5F5F7;
+  --text-primary: #F0F0F2;
   --text-secondary: #98989D;
-  --text-tertiary: #636368;
-  --text-quaternary: #48484C;
-  --text-inverse: #000000;
+  --text-tertiary: #636366;
+  --text-quaternary: #48484A;
+  --text-inverse: #0D0D0F;
 
-  --divider: rgba(84, 84, 88, 0.32);
-  --border-thin: rgba(255, 255, 255, 0.06);
-  --border-glass: rgba(255, 255, 255, 0.08);
+  --divider: rgba(255, 255, 255, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.1);
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.7);
+
+  --color-accent-light: rgba(78, 205, 196, 0.15);
+  --color-rose-light: rgba(255, 107, 107, 0.12);
 }
 
 /* ========== 通用毛玻璃工具类 ========== */
 
 .glass {
   background: var(--bg-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--border-glass);
 }
 
 .glass-card {
   background: var(--bg-elevated);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .glass-heavy {
   background: var(--bg-glass-heavy);
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  backdrop-filter: blur(36px) saturate(220%);
+  -webkit-backdrop-filter: blur(36px) saturate(220%);
+  border: 1px solid var(--border-glass);
 }

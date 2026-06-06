@@ -5,43 +5,50 @@
   right: 0;
   z-index: var(--z-tabbar);
   display: flex;
-  background: var(--bg-glass-heavy);
-  backdrop-filter: blur(30px) saturate(200%);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  border-top: 0.33px solid var(--divider);
+  align-items: center;
+  justify-content: space-around;
+  height: 48px;
   padding-bottom: var(--safe-area-bottom);
-  height: calc(50px + var(--safe-area-bottom));
+  background: var(--bg-glass-heavy);
+  backdrop-filter: blur(36px) saturate(220%);
+  -webkit-backdrop-filter: blur(36px) saturate(220%);
+  border-top: 1px solid var(--border-glass);
 }
 
 .tabItem {
-  flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  color: var(--text-quaternary);
-  transition: color var(--duration-fast) var(--ease-out);
+  gap: 1px;
+  min-width: 56px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.tabItem.active {
-  color: var(--color-primary);
+.tabItem:active {
+  transform: scale(0.92);
 }
 
 .icon {
-  transition: transform var(--duration-fast) var(--ease-spring);
-}
-
-.tabItem:active .icon {
-  transform: scale(0.84);
+  color: var(--text-tertiary);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .label {
-  font-size: var(--font-size-caption2);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-caption1);
   font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  transition: color var(--duration-fast) var(--ease-out);
   letter-spacing: 0;
 }
 
-.indicator {
-  display: none;
+/* 选中态 */
+.active .icon,
+.active .label {
+  color: var(--color-accent);
 }

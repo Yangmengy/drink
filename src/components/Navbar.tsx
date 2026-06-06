@@ -1,54 +1,37 @@
-import { ChevronLeft, Bell, Moon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Bell } from 'lucide-react';
 import styles from './Navbar.module.css';
 
 interface NavbarProps {
-  title: string;
+  title?: string;
   subtitle?: string;
-  showBack?: boolean;
-  showBell?: boolean;
-  showTheme?: boolean;
-  size?: 'large' | 'compact';
-  onThemeToggle?: () => void;
+  showNotifications?: boolean;
+  hasNotification?: boolean;
+  compact?: boolean;
 }
 
 export function Navbar({
-  title,
-  subtitle,
-  showBack = false,
-  showBell = false,
-  showTheme = false,
-  size = 'large',
-  onThemeToggle,
+  title = 'Mixology',
+  subtitle = 'APP',
+  showNotifications = true,
+  hasNotification = false,
+  compact = false,
 }: NavbarProps) {
-  const navigate = useNavigate();
-
   return (
-    <nav className={styles.navbar}>
-      <div className={styles.left}>
-        {showBack && (
-          <button className={styles.backBtn} onClick={() => navigate(-1)}>
-            <ChevronLeft size={28} strokeWidth={2} />
-          </button>
-        )}
-        <h1 className={`${styles.title} ${size === 'large' ? styles.largeTitle : styles.title1}`}>
-          {title}
-        </h1>
-      </div>
-
-      <div className={styles.right}>
-        {showTheme && (
-          <button className={styles.iconBtn} onClick={onThemeToggle}>
-            <Moon size={20} strokeWidth={1.5} />
-          </button>
-        )}
-        {showBell && (
-          <button className={styles.iconBtn}>
-            <Bell size={20} strokeWidth={1.5} />
-            <span className={styles.badge}>2</span>
-          </button>
+    <header className={`${styles.navbar} ${compact ? styles.compact : ''}`}>
+      <div className={styles.navbarContent}>
+        <div className={styles.titleGroup}>
+          <h1 className={styles.appName}>{title}</h1>
+          {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+        </div>
+        {showNotifications && (
+          <div className={styles.actions}>
+            <button className={styles.iconBtn} aria-label="通知">
+              <Bell size={15} strokeWidth={1.75} />
+              {hasNotification && <span className={styles.notificationDot} />}
+            </button>
+          </div>
         )}
       </div>
-    </nav>
+    </header>
   );
 }

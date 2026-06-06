@@ -1,0 +1,213 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  padding-bottom: calc(56px + env(safe-area-inset-bottom)); /* TabBar 高度 */
+  overflow: hidden;
+}
+
+.searchContainer {
+  padding: 0 20px 16px;
+  background: var(--color-bg-primary);
+  z-index: 10;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  background: white;
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+}
+
+.searchIcon {
+  color: var(--color-text-tertiary);
+  margin-right: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 15px;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 85px;
+  background: rgba(255,255,255,0.5);
+  overflow-y: auto;
+  border-right: 1px solid rgba(0,0,0,0.03);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.catButton {
+  padding: 12px 4px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.catButton.active {
+  background: white;
+  color: var(--color-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Right List */
+.listContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--color-bg-primary);
+}
+
+.loading {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  margin-top: 40px;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ingredientCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  transition: all 0.2s;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ingredientCard.owned {
+  border-color: rgba(78,205,196,0.3);
+  background: linear-gradient(to right, white, rgba(78,205,196,0.03));
+}
+
+.iconContainer {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.owned .iconContainer {
+  background: rgba(78,205,196,0.1);
+}
+
+.checkBadge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  background: var(--color-accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.category {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 32px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionAdd {
+  background: var(--color-text-primary);
+  color: white;
+}
+
+.actionRemove {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 60px;
+  color: var(--color-text-tertiary);
+}
+
+.emptyIcon {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: 14px;
+}

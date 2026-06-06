@@ -1,24 +1,26 @@
-.sectionHeader {
+.wrapper {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .title {
+  font-family: var(--font-family-base);
   font-size: var(--font-size-title3);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
-  letter-spacing: -0.022em;
+  letter-spacing: 0;
 }
 
 .action {
   font-size: var(--font-size-subhead);
-  color: var(--color-primary);
   font-weight: var(--font-weight-regular);
+  color: var(--color-accent);
+  cursor: pointer;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.action:active {
-  opacity: 0.6;
+.action:hover {
+  opacity: 0.7;
 }

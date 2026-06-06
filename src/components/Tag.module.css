@@ -1,49 +1,32 @@
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 7px 15px;
+  padding: 6px 14px;
   border-radius: var(--radius-full);
-  font-size: var(--font-size-subhead);
-  font-weight: var(--font-weight-regular);
-  border: none;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-footnote);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
-  letter-spacing: -0.01em;
+  transition: all var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+  user-select: none;
+
+  /* 未选中：毛玻璃 */
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
 }
 
 .tag:active {
   transform: scale(0.95);
 }
 
-.default {
-  background: var(--bg-search);
-  color: var(--text-secondary);
-}
-
-.default.selected {
-  background: var(--text-primary);
+/* 选中态：品牌色填充 */
+.selected {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: var(--text-inverse);
-  font-weight: var(--font-weight-medium);
-}
-
-.primary {
-  background: rgba(10, 132, 255, 0.12);
-  color: var(--color-primary);
-}
-
-.success {
-  background: rgba(48, 209, 88, 0.12);
-  color: var(--color-success);
-}
-
-.warning {
-  background: rgba(255, 159, 10, 0.12);
-  color: var(--color-warning);
-}
-
-.error {
-  background: rgba(255, 69, 58, 0.12);
-  color: var(--color-error);
+  box-shadow: 0 4px 14px rgba(78, 205, 196, 0.3);
 }

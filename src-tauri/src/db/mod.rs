@@ -1,4 +1,4 @@
-use sqlx::{sqlite::SqlitePool, Row, Sqlite};
+use sqlx::{sqlite::SqlitePool, Row};
 use std::path::PathBuf;
 use anyhow::Result;
 
@@ -23,7 +23,7 @@ pub async fn init_database() -> Result<SqlitePool> {
     
     // 执行 Schema
     println!("Creating database schema...");
-    let schema = include_str!("../data/schema.sql");
+    let schema = include_str!("../../data/schema.sql");
     sqlx::query(schema).execute(&pool).await?;
     
     // 检查是否需要初始化数据
@@ -34,7 +34,7 @@ pub async fn init_database() -> Result<SqlitePool> {
     
     if count == 0 {
         println!("Seeding initial data...");
-        let seed = include_str!("../data/seed.sql");
+        let seed = include_str!("../../data/seed.sql");
         sqlx::query(seed).execute(&pool).await?;
         println!("Database initialized with {} recipes", 3);
     } else {

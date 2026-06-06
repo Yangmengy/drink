@@ -25,3 +25,10 @@ dist-ssr
 
 # Tauri
 src-tauri/target
+
+# Documentation files (除了 README.md)
+*.md
+!README.md
+
+# Workbuddy memory
+.workbuddy/
