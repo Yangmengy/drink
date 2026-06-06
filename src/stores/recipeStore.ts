@@ -42,6 +42,7 @@ interface RecipeState {
   searchRecipes: (query: string) => Promise<void>;
   fetchRecipeDetail: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
+  deleteRecipe: (id: string) => Promise<boolean>;
   clearCurrentRecipe: () => void;
 }
 
@@ -172,6 +173,7 @@ export const useRecipeStore = create<RecipeState>((set) => ({
         })),
         isFavorite: result.recipe.is_favorite,
         viewCount: result.recipe.view_count,
+        source: result.recipe.source,
       };
 
       // 添加到历史记录
@@ -201,6 +203,24 @@ export const useRecipeStore = create<RecipeState>((set) => ({
       });
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+    }
+  },
+
+  deleteRecipe: async (id: string) => {
+    try {
+      await recipeApi.delete(id);
+      
+      // 从列表中移除
+      set((state) => ({
+        recipes: state.recipes.filter(r => r.id !== id),
+        currentRecipe: state.currentRecipe?.id === id ? null : state.currentRecipe,
+      }));
+      
+      return true;
+    } catch (err) {
+      console.error("Failed to delete recipe:", err);
+      set({ error: String(err) });
+      return false;
     }
   },
 

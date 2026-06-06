@@ -7,3 +7,4 @@ export { Navbar } from './Navbar';
 export { SectionTitle } from './SectionTitle';
 export { CocktailCard } from './CocktailCard';
 export { LazyImage } from './LazyImage';
+export { AddRecordModal } from './AddRecordModal';

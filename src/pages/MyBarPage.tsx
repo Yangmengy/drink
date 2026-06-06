@@ -99,10 +99,17 @@ export function MyBarPage() {
                     onClick={() => handleToggleOwned(ingredient.id, isOwned)}
                   >
                     <div className={styles.iconContainer}>
-                      <span className={styles.icon}>🥃</span>
+                      <span className={styles.icon}>
+                        {ingredient.category === 'spirit' || ingredient.category === 'spirits' ? '🥃' :
+                         ingredient.category === 'liqueur' ? '🍾' :
+                         ingredient.category === 'mixer' || ingredient.category === 'juice' ? '🧃' :
+                         ingredient.category === 'syrup' ? '🍯' :
+                         ingredient.category === 'garnish' || ingredient.category === 'herb' ? '🌿' :
+                         ingredient.category === 'ice' ? '🧊' : '🍹'}
+                      </span>
                       {isOwned && (
                         <div className={styles.checkBadge}>
-                          <Check size={12} strokeWidth={3} />
+                          <Check size={14} strokeWidth={3} />
                         </div>
                       )}
                     </div>
@@ -110,9 +117,6 @@ export function MyBarPage() {
                       <div className={styles.name}>{ingredient.name_zh}</div>
                       <div className={styles.category}>{categoryNames[ingredient.category] || ingredient.category}</div>
                     </div>
-                    <button className={`${styles.actionBtn} ${isOwned ? styles.actionRemove : styles.actionAdd}`}>
-                      {isOwned ? '移除' : <Plus size={16} />}
-                    </button>
                   </div>
                 );
               })}

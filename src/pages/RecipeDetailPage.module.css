@@ -249,3 +249,127 @@
 @media (min-width: 768px) {
   .content { max-width: 800px; margin-left: auto; margin-right: auto; }
 }
+
+/* ========== 删除图标按钮 ========== */
+.deleteIconButton {
+  color: #ff5252 !important;
+}
+
+.deleteIconButton:hover {
+  background: rgba(255, 82, 82, 0.2) !important;
+}
+
+/* ========== 删除确认对话框 ========== */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s var(--ease-out);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.confirmModal {
+  background: var(--color-bg-card);
+  border-radius: 24px;
+  padding: 32px 24px 24px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  animation: slideUp 0.3s var(--ease-out);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.confirmIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.confirmTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 12px;
+}
+
+.confirmMessage {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.confirmMessage strong {
+  color: #ff5252;
+  font-weight: 600;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirmCancel,
+.confirmDelete {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+  border: none;
+}
+
+.confirmCancel {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.confirmCancel:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.confirmDelete {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  color: white;
+}
+
+.confirmDelete:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.4);
+}
+
+.confirmDelete:active,
+.confirmCancel:active {
+  transform: translateY(0);
+}

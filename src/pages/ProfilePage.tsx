@@ -1,94 +1,180 @@
-import { Settings, Bookmark, Clock, Star, Share2, HelpCircle, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Bookmark, Clock, Star, Share2, HelpCircle, ChevronRight, Camera } from 'lucide-react';
 import { Navbar } from '@/components';
-
-const menuItems = [
-  { icon: Bookmark, label: '我的收藏', value: '12', color: '#FF9F0A' },
-  { icon: Clock, label: '浏览历史', value: '36', color: '#5AC8FA' },
-  { icon: Star, label: '我的评分', value: '8', color: '#FF6B6B' },
-];
-
-const settingsItems = [
-  { icon: Settings, label: '偏好设置' },
-  { icon: Share2, label: '分享给朋友' },
-  { icon: HelpCircle, label: '帮助与反馈' },
-];
+import { userApi, imageApi } from '@/api/client';
+import type { UserProfile, UserStats } from '@/types';
+import styles from './ProfilePage.module.css';
 
 export function ProfilePage() {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [profileData, statsData] = await Promise.all([
+        userApi.getProfile(),
+        userApi.getStats(),
+      ]);
+      setProfile(profileData);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Failed to load profile data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = (reader.result as string).split(',')[1];
+        try {
+          const filename = await imageApi.upload(base64Data);
+          await userApi.updateProfile({ avatar: filename });
+          await loadData(); // 重新加载数据
+        } catch (error) {
+          console.error('Failed to upload avatar:', error);
+          alert('头像上传失败，请重试');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Failed to read file:', error);
+    }
+  };
+
+  const handleNameClick = async () => {
+    const newName = window.prompt('修改昵称', profile?.username || '喵星人');
+    if (newName && newName.trim() && newName !== profile?.username) {
+      try {
+        await userApi.updateProfile({ username: newName.trim() });
+        await loadData(); // 重新加载数据
+      } catch (error) {
+        console.error('Failed to update username:', error);
+        alert('昵称修改失败，请重试');
+      }
+    }
+  };
+
+  const handleShare = () => {
+    alert('分享功能开发中...');
+  };
+
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <Navbar title="我的" subtitle="PROFILE" showNotifications={false} />
+        <div className={styles.loading}>加载中...</div>
+      </div>
+    );
+  }
+
+  const username = profile?.username || '喵星人';
+  const avatar = profile?.avatar;
+
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 24px)' }}>
+    <div className={styles.page}>
       <Navbar title="我的" subtitle="PROFILE" showNotifications={false} />
-
-      <div style={{ padding: '0 20px' }}>
-        {/* 用户卡片 */}
-        <div style={{
-          borderRadius: 24, padding: 28, marginBottom: 28,
-          background: 'rgba(255,255,255,0.72)',
-          backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.3)',
-          boxShadow: '0 8px 28px rgba(0,0,0,0.06)',
-          display: 'flex', alignItems: 'center', gap: 18,
-        }}>
-          <div style={{
-            width: 68, height: 68, borderRadius: '50%',
-            background: 'linear-gradient(145deg, #4ECDC4, #44B5AD)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, color: '#fff', fontWeight: 700, flexShrink: 0,
-          }}>
-            M
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#333', marginBottom: 4 }}>
-              Mixology 爱好者
-            </div>
-            <div style={{ fontSize: 14, color: '#999' }}>
-              探索鸡尾酒的无限可能
-            </div>
-          </div>
-          <ChevronRight size={20} strokeWidth={1.75} color="#ccc" />
-        </div>
-
-        {/* 数据面板 */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 28,
-        }}>
-          {menuItems.map((item) => (
-            <div key={item.label} style={{
-              padding: '16px 12px', borderRadius: 20, textAlign: 'center',
-              background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.04)', cursor: 'pointer',
+      
+      <div className={styles.content}>
+        {/* 用户信息卡片 */}
+        <button className={styles.userCard} onClick={handleNameClick}>
+          <div className={styles.avatarContainer}>
+            <div className={styles.avatar} onClick={(e) => {
+              e.stopPropagation();
+              handleAvatarClick();
             }}>
-              <item.icon size={22} strokeWidth={1.75} color={item.color} style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#333' }}>{item.value}</div>
-              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{item.label}</div>
+              {avatar ? (
+                <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                username.charAt(0).toUpperCase()
+              )}
+              <div className={styles.avatarOverlay}>
+                <Camera size={12} color="white" />
+              </div>
             </div>
-          ))}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarChange}
+              accept="image/*"
+              style={{ display: 'none' }}
+            />
+          </div>
+          <div className={styles.userInfo}>
+            <h2 className={styles.username}>
+              {username}
+            </h2>
+            <p className={styles.userHint}>点击可修改昵称与头像</p>
+          </div>
+          <ChevronRight size={16} className={styles.userArrow} />
+        </button>
+
+        {/* 数据统计卡片 */}
+        <div className={styles.statsGrid}>
+          <button className={styles.statCard} onClick={() => navigate('/favorites')}>
+            <Bookmark className={styles.statIcon} size={22} color="#FFA726" strokeWidth={1.75} />
+            <div className={styles.statNumber}>{stats?.favoriteCount || 0}</div>
+            <div className={styles.statLabel}>我的收藏</div>
+          </button>
+
+          <button className={styles.statCard} onClick={() => navigate('/history')}>
+            <Clock className={styles.statIcon} size={22} color="#5FC3E4" strokeWidth={1.75} />
+            <div className={styles.statNumber}>{stats?.historyCount || 0}</div>
+            <div className={styles.statLabel}>浏览历史</div>
+          </button>
+
+          <button className={styles.statCard} onClick={() => navigate('/ratings')}>
+            <Star className={styles.statIcon} size={22} color="#F57F7E" strokeWidth={1.75} />
+            <div className={styles.statNumber}>{stats?.ratingCount || 0}</div>
+            <div className={styles.statLabel}>我的评分</div>
+          </button>
         </div>
 
-        {/* 设置菜单 */}
-        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#999', marginBottom: 12, paddingLeft: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          设置
-        </h3>
-        <div style={{
-          borderRadius: 20, overflow: 'hidden',
-          background: 'rgba(255,255,255,0.64)', backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.04)',
-        }}>
-          {settingsItems.map((item, idx) => (
-            <div key={item.label} style={{
-              display: 'flex', alignItems: 'center', gap: 14, padding: 16,
-              borderBottom: idx < settingsItems.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
-              cursor: 'pointer',
-            }}>
-              <item.icon size={20} strokeWidth={1.75} color="#999" />
-              <span style={{ flex: 1, fontSize: 16, fontWeight: 500, color: '#333' }}>{item.label}</span>
-              <ChevronRight size={16} strokeWidth={1.75} color="#ccc" />
-            </div>
-          ))}
+        {/* 设置列表 */}
+        <div className={styles.settingsSection}>
+          <h3 className={styles.sectionTitle}>设置</h3>
+          <div className={styles.settingsList}>
+            <button className={styles.settingsItem} onClick={() => navigate('/settings')}>
+              <Settings className={styles.settingsIcon} size={20} strokeWidth={1.75} />
+              <span className={styles.settingsLabel}>偏好设置</span>
+              <ChevronRight className={styles.settingsArrow} size={16} strokeWidth={1.75} />
+            </button>
+
+            <button className={styles.settingsItem} onClick={handleShare}>
+              <Share2 className={styles.settingsIcon} size={20} strokeWidth={1.75} />
+              <span className={styles.settingsLabel}>分享给朋友</span>
+              <ChevronRight className={styles.settingsArrow} size={16} strokeWidth={1.75} />
+            </button>
+
+            <button className={styles.settingsItem} onClick={() => navigate('/help')}>
+              <HelpCircle className={styles.settingsIcon} size={20} strokeWidth={1.75} />
+              <span className={styles.settingsLabel}>帮助与反馈</span>
+              <ChevronRight className={styles.settingsArrow} size={16} strokeWidth={1.75} />
+            </button>
+          </div>
         </div>
 
-        {/* 版本信息 */}
-        <div style={{ textAlign: 'center', padding: '32px 0', color: '#ccc', fontSize: 13 }}>
+        {/* 版本号 */}
+        <div className={styles.versionText}>
           Mixology v1.0.0
         </div>
       </div>

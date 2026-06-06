@@ -4,6 +4,9 @@
 mod commands;
 mod db;
 mod models;
+pub mod error;
+pub mod repositories;
+pub mod services;
 
 use commands::*;
 
@@ -31,6 +34,9 @@ async fn main() {
             search_recipes,
             get_recipe_by_id,
             get_recipes,
+            create_custom_recipe,
+            update_recipe_image,
+            delete_recipe,
             get_recommended_recipes,
             get_favorite_recipes,
             toggle_favorite,
@@ -48,6 +54,7 @@ async fn main() {
             
             // 图片相关命令
             get_image_url,
+            upload_image,
             
             // 待做相关命令
             get_todos,
@@ -58,6 +65,12 @@ async fn main() {
             // 记录相关命令
             get_drink_logs,
             add_drink_log,
+            delete_drink_log,
+            
+            // 用户相关命令
+            get_user_profile,
+            update_user_profile,
+            get_user_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

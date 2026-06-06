@@ -153,9 +153,57 @@ CREATE TABLE IF NOT EXISTS drink_logs (
     date_str TEXT NOT NULL,
     rating INTEGER,
     notes TEXT,
+    images TEXT,
     created_at INTEGER NOT NULL,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
+
+-- ============================================
+-- 11. 用户信息表 (user_profile)
+-- ============================================
+CREATE TABLE IF NOT EXISTS user_profile (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    username TEXT NOT NULL DEFAULT '喵星人',
+    avatar TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- 插入默认用户
+INSERT OR IGNORE INTO user_profile (id, username, created_at, updated_at)
+VALUES (1, '喵星人', strftime('%s', 'now'), strftime('%s', 'now'));
+
+-- ============================================
+-- 12. 配方评分表 (recipe_ratings)
+-- ============================================
+CREATE TABLE IF NOT EXISTS recipe_ratings (
+    id TEXT PRIMARY KEY,
+    recipe_id TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+    notes TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted_at INTEGER,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+    UNIQUE(recipe_id)
+);
+
+-- ============================================
+-- 13. 用户设置表 (user_settings)
+-- ============================================
+CREATE TABLE IF NOT EXISTS user_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    dark_mode INTEGER DEFAULT 0,
+    language TEXT DEFAULT 'zh',
+    notification_enabled INTEGER DEFAULT 1,
+    unit_system TEXT DEFAULT 'ml',
+    theme_color TEXT DEFAULT '#4ECDC4',
+    updated_at INTEGER NOT NULL
+);
+
+-- 插入默认设置
+INSERT OR IGNORE INTO user_settings (id, updated_at)
+VALUES (1, strftime('%s', 'now'));
 
 -- ============================================
 -- 索引 (Indexes)

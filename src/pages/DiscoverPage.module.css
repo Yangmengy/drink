@@ -5,13 +5,13 @@
 }
 
 .content {
-  padding: var(--spacing-md) var(--content-padding) 0;
+  padding: 15px var(--content-padding) 0;
 }
 
 /* ========== 搜索栏间距 ========== */
 
 .searchBar {
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: 15px;
 }
 
 /* ========== “今日灵感” 卡片 ========== */

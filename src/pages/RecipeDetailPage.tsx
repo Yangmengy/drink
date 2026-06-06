@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Clock, Bookmark, BookmarkCheck } from 'lucide-react';
+import { ArrowLeft, Heart, Clock, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { todoApi } from '@/api/client';
 import styles from './RecipeDetailPage.module.css';
@@ -14,8 +14,9 @@ const DIFFICULTY_DOTS: Record<string, number> = {
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentRecipe, loading, error, fetchRecipeDetail, toggleFavorite, clearCurrentRecipe } = useRecipeStore();
+  const { currentRecipe, loading, error, fetchRecipeDetail, toggleFavorite, clearCurrentRecipe, deleteRecipe } = useRecipeStore();
   const [isTodo, setIsTodo] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -40,6 +41,23 @@ export function RecipeDetailPage() {
       console.error(e);
     }
   };
+
+  const handleDelete = async () => {
+    if (!currentRecipe || !id) return;
+    
+    const success = await deleteRecipe(id);
+    
+    if (success) {
+      // 删除成功，返回首页
+      navigate('/', { replace: true });
+    } else {
+      // 删除失败，显示错误提示
+      alert('删除失败，请重试');
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const isCustomRecipe = currentRecipe?.source === 'custom';
 
   if (loading) {
     return (
@@ -75,6 +93,16 @@ export function RecipeDetailPage() {
           <ArrowLeft size={20} />
         </button>
         <div className={styles.navActions}>
+          {/* 删除按钮 - 仅自定义配方显示 */}
+          {isCustomRecipe && (
+            <button 
+              className={`${styles.navButton} ${styles.deleteIconButton}`}
+              onClick={() => setShowDeleteConfirm(true)}
+              title="删除配方"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
           <button 
             className={`${styles.navButton} ${isTodo ? styles.todoActive : ''}`} 
             onClick={toggleTodo}
@@ -286,6 +314,34 @@ export function RecipeDetailPage() {
           </div>
         )}
       </div>
+
+      {/* 删除确认对话框 */}
+      {showDeleteConfirm && (
+        <div className={styles.modalOverlay} onClick={() => setShowDeleteConfirm(false)}>
+          <div className={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmIcon}>⚠️</div>
+            <h3 className={styles.confirmTitle}>确认删除</h3>
+            <p className={styles.confirmMessage}>
+              确定要删除「{currentRecipe.nameZh}」吗？<br/>
+              <strong>此操作无法撤销</strong>
+            </p>
+            <div className={styles.confirmActions}>
+              <button 
+                className={styles.confirmCancel}
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                取消
+              </button>
+              <button 
+                className={styles.confirmDelete}
+                onClick={handleDelete}
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

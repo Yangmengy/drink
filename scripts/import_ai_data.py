@@ -12,7 +12,7 @@ def get_db_path():
     system = platform.system()
     
     if system == "Darwin":
-        return os.path.join(home, "Library", "Application Support", "com.cocktail.app", "cocktail.db")
+        return os.path.join(home, "Library", "Application Support", "cocktail-app", "cocktail.db")
     elif system == "Windows":
         return os.path.join(os.getenv("APPDATA", ""), "com.cocktail.app", "cocktail.db")
     else:

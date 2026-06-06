@@ -26,6 +26,9 @@ pub async fn init_database() -> Result<SqlitePool> {
     let schema = include_str!("../../data/schema.sql");
     sqlx::query(schema).execute(&pool).await?;
     
+    // 向后兼容迁移：尝试给 drink_logs 添加 images 字段
+    let _ = sqlx::query("ALTER TABLE drink_logs ADD COLUMN images TEXT").execute(&pool).await;
+    
     // 检查是否需要初始化数据
     let count: i64 = sqlx::query("SELECT COUNT(*) as count FROM recipes")
         .fetch_one(&pool)

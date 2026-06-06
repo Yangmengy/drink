@@ -153,3 +153,25 @@ pub struct RecipeIngredientDetail {
     pub recipe_ingredient: RecipeIngredient,
     pub ingredient: Ingredient,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DrinkLog {
+    pub id: String,
+    pub recipe_id: String,
+    pub date_str: String,
+    pub rating: Option<i32>,
+    pub notes: Option<String>,
+    pub images: Option<String>,
+    pub created_at: i64,
+    pub recipe: Option<Recipe>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TodoItem {
+    pub id: String,
+    pub recipe_id: String,
+    pub created_at: i64,
+    pub recipe: Recipe,
+    pub owned_ingredients: i32,
+    pub total_ingredients: i32,
+}

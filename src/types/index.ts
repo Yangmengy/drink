@@ -76,6 +76,7 @@ export interface RecipeDetail {
   steps: RecipeDetailStep[];
   isFavorite: boolean;
   viewCount: number;
+  source: string | null; // 'custom' 表示用户自定义，null 或其他表示内置
 }
 
 // ===== Database Recipe (SQLite schema, for later) =====
@@ -226,6 +227,28 @@ export interface DrinkLog {
   date_str: string;
   rating: number | null;
   notes: string | null;
+  images?: string | null; // JSON array string
   created_at: number;
   recipe: DBRecipe | null;
+}
+
+// ===== User Profile =====
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  avatar: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserStats {
+  favoriteCount: number;
+  historyCount: number;
+  ratingCount: number;
+}
+
+export interface UpdateProfileArgs {
+  username?: string;
+  avatar?: string;
 }

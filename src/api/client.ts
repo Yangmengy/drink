@@ -22,6 +22,12 @@ export const recipeApi = {
     apiInvoke<DBRecipeDetail | null>("get_recipe_by_id", { id }),
   search: (query: string) =>
     apiInvoke<DBRecipe[]>("search_recipes", { query }),
+  createCustom: (nameZh: string, category: string, imageUrl: string | null) =>
+    apiInvoke<string>("create_custom_recipe", { nameZh, category, imageUrl }),
+  updateImage: (recipeId: string, imageUrl: string) =>
+    apiInvoke<void>("update_recipe_image", { recipeId, imageUrl }),
+  delete: (recipeId: string) =>
+    apiInvoke<void>("delete_recipe", { recipeId }),
 };
 
 export const inventoryApi = {
@@ -44,6 +50,18 @@ export const todoApi = {
 
 export const logApi = {
   list: (dateStr?: string) => apiInvoke<import("../types").DrinkLog[]>("get_drink_logs", { dateStr }),
-  add: (recipeId: string, dateStr: string, rating: number | null, notes: string | null) => 
-    apiInvoke<boolean>("add_drink_log", { recipeId, dateStr, rating, notes }),
+  add: (recipeId: string, dateStr: string, rating: number | null, notes: string | null, images: string[] | null) => 
+    apiInvoke<boolean>("add_drink_log", { recipeId, dateStr, rating, notes, images }),
+  delete: (logId: string) => apiInvoke<boolean>("delete_drink_log", { logId }),
+};
+
+export const imageApi = {
+  upload: (base64Data: string) => apiInvoke<string>("upload_image", { base64Data }),
+};
+
+export const userApi = {
+  getProfile: () => apiInvoke<import("../types").UserProfile>("get_user_profile"),
+  updateProfile: (args: import("../types").UpdateProfileArgs) => 
+    apiInvoke<import("../types").UserProfile>("update_user_profile", args as Record<string, unknown>),
+  getStats: () => apiInvoke<import("../types").UserStats>("get_user_stats"),
 };
