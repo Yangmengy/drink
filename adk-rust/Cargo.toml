@@ -1,0 +1,158 @@
+[workspace]
+resolver = "2"
+members = [
+    # Core packages (publishable to crates.io)
+    "adk-core",
+    "adk-rust-macros",
+    "adk-agent",
+    "adk-model",
+    "adk-tool",
+    "adk-runner",
+    "adk-server",
+    "adk-session",
+    "adk-artifact",
+    "adk-memory",
+    "adk-cli",
+    "adk-realtime",
+    "adk-graph",
+    "adk-browser",
+    "adk-eval",
+    "adk-telemetry",
+    "adk-guardrail",
+    "adk-auth",
+    "adk-plugin",
+    "adk-skill",
+    "adk-rust",
+    "adk-gemini",
+    "adk-code",
+    "adk-sandbox",
+    "adk-rag",
+    "adk-audio",
+    "adk-deploy",
+    "adk-payments",
+    "adk-action",
+    "adk-anthropic",
+
+    # CLI tools
+    "cargo-adk",
+
+]
+exclude = [
+    # Git-only packages with GPU dependencies (build explicitly with: cargo build -p adk-mistralrs)
+    # Excluded to prevent --all-features from failing without CUDA toolkit
+    "adk-mistralrs",
+
+    # Extracted to standalone repo: https://github.com/zavora-ai/adk-studio
+    "adk-studio",
+
+    # Reference implementations (not part of workspace)
+    "reference/adk-go",
+    "reference/mcp-rust-sdk",
+    "reference/gemini-rust",
+    # Learning materials (gitignored, not part of CI)
+    "learning",
+]
+
+[profile.dev]
+debug = 1                    # Line tables only — faster builds, still get backtraces
+split-debuginfo = "packed"
+incremental = true           # Faster recompilation on code changes
+opt-level = 0                # No optimization in dev — fastest compile
+
+[profile.dev.package."*"]
+opt-level = 1                # Slight optimization for dependencies (they rarely change)
+debug = false                # No debug info for deps — saves link time
+
+[profile.release]
+strip = true
+opt-level = 3
+lto = true
+
+# Fast example builds: no debug info, max codegen parallelism
+# Usage: cargo build --examples --profile example-dev
+[profile.example-dev]
+inherits = "dev"
+opt-level = 0
+debug = 0
+codegen-units = 256
+incremental = true
+
+[profile.example-dev.package."*"]
+incremental = false
+opt-level = 1
+
+# CI profile: like release but faster to compile (no LTO)
+[profile.ci]
+inherits = "release"
+lto = false
+strip = false
+opt-level = 2
+
+[workspace.package]
+version = "0.7.0"
+edition = "2024"
+rust-version = "1.85.0"
+license = "Apache-2.0"
+authors = ["James Karanja Maina <james.karanja@zavora.ai>"]
+homepage = "https://www.zavora.ai"
+repository = "https://github.com/zavora-ai/adk-rust"
+
+[workspace.dependencies]
+# External dependencies
+tokio = { version = "1.40", default-features = false }
+tokio-stream = "0.1"
+async-trait = "0.1"
+futures = "0.3"
+async-stream = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+anyhow = "1.0"
+uuid = { version = "1.23", features = ["v4", "serde"] }
+chrono = { version = "0.4.44", features = ["serde"] }
+regex = "1.10"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+opentelemetry = "0.31"
+# Unify rustls crypto provider to 'aws-lc-rs' across the workspace.
+rustls = { version = "0.23", features = ["aws-lc-rs"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots", "connect"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart", "http2", "charset"] }
+toml = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+flate2 = "1.0"
+tar = "0.4"
+livekit = { version = "0.7.36", default-features = false, features = ["tokio", "native-tls"] }
+livekit-api = { version = "0.4.18", default-features = false, features = ["signal-client-tokio", "services-tokio", "access-token"] }
+
+# ADK internal crates (use { workspace = true } in member crates)
+adk-core = { path = "adk-core", version = "0.7.0" }
+adk-rust-macros = { path = "adk-rust-macros", version = "0.7.0" }
+adk-agent = { path = "adk-agent", version = "0.7.0" }
+adk-model = { path = "adk-model", version = "0.7.0" }
+adk-tool = { path = "adk-tool", version = "0.7.0" }
+adk-runner = { path = "adk-runner", version = "0.7.0" }
+adk-server = { path = "adk-server", version = "0.7.0" }
+adk-session = { path = "adk-session", version = "0.7.0" }
+adk-artifact = { path = "adk-artifact", version = "0.7.0" }
+adk-memory = { path = "adk-memory", version = "0.7.0" }
+adk-cli = { path = "adk-cli", version = "0.7.0" }
+adk-realtime = { path = "adk-realtime", version = "0.7.0" }
+adk-graph = { path = "adk-graph", version = "0.7.0" }
+adk-browser = { path = "adk-browser", version = "0.7.0" }
+adk-eval = { path = "adk-eval", version = "0.7.0" }
+adk-telemetry = { path = "adk-telemetry", version = "0.7.0" }
+adk-guardrail = { path = "adk-guardrail", version = "0.7.0" }
+adk-auth = { path = "adk-auth", version = "0.7.0" }
+adk-plugin = { path = "adk-plugin", version = "0.7.0" }
+adk-skill = { path = "adk-skill", version = "0.7.0" }
+adk-gemini = { path = "adk-gemini", version = "0.7.0" }
+adk-code = { path = "adk-code", version = "0.7.0" }
+adk-sandbox = { path = "adk-sandbox", version = "0.7.0" }
+adk-rag = { path = "adk-rag", version = "0.7.0" }
+adk-audio = { path = "adk-audio", version = "0.7.0" }
+adk-deploy = { path = "adk-deploy", version = "0.7.0" }
+adk-payments = { path = "adk-payments", version = "0.7.0" }
+adk-action = { path = "adk-action", version = "0.7.0" }
+adk-anthropic = { path = "adk-anthropic", version = "0.7.0" }

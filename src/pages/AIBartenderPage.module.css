@@ -1,0 +1,679 @@
+.container {
+  min-height: 100vh;
+  /* 使用全局背景，不再设置固定背景 */
+  background: transparent;
+  padding: 2rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装饰 - 简化版 */
+.backgroundDecor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.3; /* 降低透明度，保持简洁 */
+}
+
+.neonCircle,
+.neonCircle2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15; /* 进一步降低透明度 */
+  animation: float 8s ease-in-out infinite;
+}
+
+.neonCircle {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--color-accent, #4ecdc4), transparent);
+  top: 10%;
+  left: 10%;
+}
+
+.neonCircle2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, var(--color-primary, #ff6b6b), transparent);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -4s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-30px);
+  }
+}
+
+/* ===== 输入阶段 ===== */
+.inputSection {
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.title {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.neonText {
+  display: block;
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(45deg, var(--color-accent, #4ecdc4), var(--color-primary, #ff6b6b));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.subtitle {
+  display: block;
+  font-size: 1.2rem;
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.6));
+  margin-top: 0.5rem;
+}
+
+/* 个性卡片 - 适配浅色背景 */
+.personalityCard {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.personalityInfo {
+  display: flex;
+  gap: 2rem;
+  color: var(--color-text-primary, #333);
+  font-size: 0.9rem;
+}
+
+.editButton {
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--color-accent, #4ecdc4);
+  border: 1px solid var(--color-accent, #4ecdc4);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.editButton:hover {
+  background: rgba(78, 205, 196, 0.25);
+  transform: translateY(-2px);
+}
+
+/* Section */
+.section {
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  color: var(--color-text-primary, #333);
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* 心情网格 - 适配浅色背景 */
+.moodGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 1rem;
+}
+
+.moodButton {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.moodButton:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.moodButton.selected {
+  background: rgba(78, 205, 196, 0.2);
+  border-color: var(--color-accent, #4ecdc4);
+  box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
+}
+
+.emoji {
+  font-size: 2rem;
+}
+
+.label {
+  color: var(--color-text-primary, #333);
+  font-size: 0.9rem;
+}
+
+/* 天气网格 - 适配浅色背景 */
+.weatherGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.weatherButton {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.weatherButton:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.weatherButton.selected {
+  background: rgba(255, 107, 107, 0.2);
+  border-color: var(--color-primary, #ff6b6b);
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+}
+
+/* 开始按钮 */
+.startButton {
+  width: 100%;
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+  border: none;
+  padding: 1.5rem;
+  border-radius: 16px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  transition: all 0.3s;
+  box-shadow: 0 10px 30px rgba(78, 205, 196, 0.3);
+}
+
+.startButton:hover:not(:disabled) {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(78, 205, 196, 0.5);
+}
+
+.startButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttonIcon {
+  font-size: 1.5rem;
+}
+
+/* ===== 加载阶段 ===== */
+.loadingSection {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 2rem;
+}
+
+.shakerAnimation {
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shaker {
+  font-size: 5rem;
+  animation: shake 0.5s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(-10deg) translateY(-10px);
+  }
+  75% {
+    transform: rotate(10deg) translateY(-10px);
+  }
+}
+
+.loadingText {
+  color: var(--color-text-primary, #333);
+  font-size: 1.2rem;
+  animation: fadeInOut 2s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ===== 结果阶段 ===== */
+.resultSection {
+  max-width: 700px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.resultTitle {
+  color: var(--color-text-primary, #333);
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-weight: 600;
+}
+
+/* 酒款卡片 - 适配浅色背景 */
+.recipeCard {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  animation: slideUp 0.5s ease-out;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recipeImage {
+  width: 100%;
+  height: 300px;
+  background-size: cover;
+  background-position: center;
+}
+
+.recipeInfo {
+  padding: 1.5rem;
+}
+
+.recipeName {
+  color: var(--color-text-primary, #333);
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.recipeNameEn {
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.6));
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.recipeDetails {
+  display: flex;
+  gap: 1.5rem;
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.7));
+  font-size: 0.9rem;
+}
+
+/* 推介词卡片 - 适配浅色背景 */
+.reasonCard {
+  background: rgba(78, 205, 196, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  animation: slideUp 0.5s ease-out 0.2s backwards;
+  box-shadow: 0 2px 10px rgba(78, 205, 196, 0.1);
+}
+
+.reasonText {
+  color: var(--color-text-primary, #333);
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 记忆卡片 - 适配浅色背景 */
+.memoryCard {
+  background: rgba(255, 107, 107, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  animation: slideUp 0.5s ease-out 0.3s backwards;
+  box-shadow: 0 2px 10px rgba(255, 107, 107, 0.1);
+}
+
+.memoryText {
+  color: var(--color-text-primary, #333);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* 操作按钮 - 适配浅色背景 */
+.actionButtons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  animation: slideUp 0.5s ease-out 0.4s backwards;
+}
+
+.actionButton {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  color: var(--color-text-primary, #333);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.actionButton:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.actionButton.primary {
+  background: linear-gradient(135deg, var(--color-accent, #4ecdc4), #44a08d);
+  border-color: var(--color-accent, #4ecdc4);
+  color: white;
+  box-shadow: 0 5px 20px rgba(78, 205, 196, 0.3);
+}
+
+.actionButton.primary:hover {
+  box-shadow: 0 8px 30px rgba(78, 205, 196, 0.5);
+}
+
+/* 反馈按钮 - 适配浅色背景 */
+.feedbackButtons {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  animation: slideUp 0.5s ease-out 0.5s backwards;
+}
+
+.feedbackButton {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-primary, #333);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.8rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.feedbackButton:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 重新推荐按钮 - 适配浅色背景 */
+.restartButton {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-secondary, rgba(0, 0, 0, 0.6));
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  animation: slideUp 0.5s ease-out 0.6s backwards;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.restartButton:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-primary, #333);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .neonText {
+    font-size: 2rem;
+  }
+
+  .moodGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .weatherGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .actionButtons {
+    flex-direction: column;
+  }
+
+  .recipeImage {
+    height: 200px;
+  }
+}
+
+
+/* 返回按钮 - 适配浅色背景 */
+.backButton {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary, #333);
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* 编辑弹窗 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modalContent {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+.modalTitle {
+  color: #1a1a2e;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.inputGroup {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: block;
+  color: #1a1a2e;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(78, 205, 196, 0.3);
+  border-radius: 12px;
+  font-size: 1rem;
+  color: #1a1a2e;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #4ecdc4;
+  background: white;
+}
+
+.input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.modalButtons {
+  display: flex;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.cancelButton,
+.saveButton {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: none;
+}
+
+.cancelButton {
+  background: rgba(0, 0, 0, 0.1);
+  color: #1a1a2e;
+}
+
+.cancelButton:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.saveButton {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+  box-shadow: 0 5px 20px rgba(78, 205, 196, 0.3);
+}
+
+.saveButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(78, 205, 196, 0.5);
+}

@@ -115,17 +115,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 );
 
 -- ============================================
--- 7. 收藏表 (favorites)
--- ============================================
-CREATE TABLE IF NOT EXISTS favorites (
-    id TEXT PRIMARY KEY,
-    recipe_id TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
-);
-
--- ============================================
--- 8. 历史记录表 (history)
+-- 7. 历史记录表 (history)
 -- ============================================
 CREATE TABLE IF NOT EXISTS history (
     id TEXT PRIMARY KEY,
@@ -135,7 +125,7 @@ CREATE TABLE IF NOT EXISTS history (
 );
 
 -- ============================================
--- 9. 待做清单表 (todo_list)
+-- 8. 待做清单表 (todo_list)
 -- ============================================
 CREATE TABLE IF NOT EXISTS todo_list (
     id TEXT PRIMARY KEY,
@@ -145,7 +135,7 @@ CREATE TABLE IF NOT EXISTS todo_list (
 );
 
 -- ============================================
--- 10. 饮酒记录表 (drink_logs)
+-- 9. 饮酒记录表 (drink_logs)
 -- ============================================
 CREATE TABLE IF NOT EXISTS drink_logs (
     id TEXT PRIMARY KEY,
@@ -159,12 +149,18 @@ CREATE TABLE IF NOT EXISTS drink_logs (
 );
 
 -- ============================================
--- 11. 用户信息表 (user_profile)
+-- 10. 用户信息表 (user_profile)
 -- ============================================
 CREATE TABLE IF NOT EXISTS user_profile (
     id INTEGER PRIMARY KEY DEFAULT 1,
     username TEXT NOT NULL DEFAULT '喵星人',
     avatar TEXT,
+    bio TEXT,
+    mbti TEXT,
+    zodiac TEXT,
+    llm_api_key TEXT,
+    llm_model TEXT,
+    llm_base_url TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -174,7 +170,7 @@ INSERT OR IGNORE INTO user_profile (id, username, created_at, updated_at)
 VALUES (1, '喵星人', strftime('%s', 'now'), strftime('%s', 'now'));
 
 -- ============================================
--- 12. 配方评分表 (recipe_ratings)
+-- 11. 配方评分表 (recipe_ratings)
 -- ============================================
 CREATE TABLE IF NOT EXISTS recipe_ratings (
     id TEXT PRIMARY KEY,
@@ -189,7 +185,7 @@ CREATE TABLE IF NOT EXISTS recipe_ratings (
 );
 
 -- ============================================
--- 13. 用户设置表 (user_settings)
+-- 12. 用户设置表 (user_settings)
 -- ============================================
 CREATE TABLE IF NOT EXISTS user_settings (
     id INTEGER PRIMARY KEY DEFAULT 1,
@@ -223,10 +219,6 @@ CREATE INDEX IF NOT EXISTS idx_recipe_steps_recipe_id ON recipe_steps(recipe_id)
 
 -- 库存表索引
 CREATE INDEX IF NOT EXISTS idx_user_inventory_ingredient_id ON user_inventory(ingredient_id);
-
--- 收藏表索引
-CREATE INDEX IF NOT EXISTS idx_favorites_recipe_id ON favorites(recipe_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_unique ON favorites(recipe_id);
 
 -- 历史记录索引
 CREATE INDEX IF NOT EXISTS idx_history_recipe_id ON history(recipe_id);

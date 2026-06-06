@@ -22,6 +22,8 @@ anyhow = "1"
 thiserror = "1"
 dirs = "5"
 base64 = "0.22.1"
+adk-rust = { path = "../adk-rust/adk-rust", features = ["standard", "openai"] }
+adk-session = { path = "../adk-rust/adk-session", features = ["sqlite"] }
 
 [profile.release]
 panic = "abort"

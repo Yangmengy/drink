@@ -11,12 +11,15 @@
 
 /* Calendar Overrides */
 .calendarCard {
-  background: white;
-  border-radius: var(--radius-xl);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   margin-bottom: 24px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .calendar {
@@ -27,114 +30,208 @@
 }
 
 :global(.react-calendar__navigation) {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 :global(.react-calendar__navigation button) {
-  min-width: 44px;
+  min-width: 40px;
+  height: 40px;
   background: none;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
-  border-radius: 8px;
+  border-radius: 12px;
+  transition: all 0.2s;
 }
 
 :global(.react-calendar__navigation button:enabled:hover),
 :global(.react-calendar__navigation button:enabled:focus) {
-  background: var(--color-bg-secondary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:global(.react-calendar__navigation button:enabled:active) {
+  transform: scale(0.95);
+}
+
+:global(.react-calendar__navigation__label) {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  pointer-events: none;
 }
 
 :global(.react-calendar__month-view__weekdays) {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  margin-bottom: 8px;
+  text-transform: none;
+  margin-bottom: 12px;
+}
+
+:global(.react-calendar__month-view__weekdays__weekday) {
+  padding: 8px 0;
+  text-align: center;
 }
 
 :global(.react-calendar__month-view__weekdays__weekday abbr) {
   text-decoration: none;
 }
 
+:global(.react-calendar__month-view__days) {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
 :global(.react-calendar__month-view__days__day) {
-  height: 44px;
+  aspect-ratio: 1 !important;
+  width: 100% !important;
+  height: auto !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--color-text-secondary);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  background: rgba(0, 0, 0, 0.02);
+  border: none;
+  transition: all 0.2s;
 }
 
 :global(.react-calendar__tile) {
-  padding: 4px;
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: 100% !important;
 }
 
+/* 今日高亮 - 橙棕色填充 */
 :global(.react-calendar__tile--now) {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-:global(.react-calendar__tile--active) {
-  background: var(--color-accent) !important;
+  background: #C89968 !important;
   color: white !important;
+  font-weight: 600;
 }
 
+/* 选中状态 - 主题色边框 */
+:global(.react-calendar__tile--active) {
+  background: rgba(78, 205, 196, 0.15) !important;
+  box-shadow: 0 0 0 2px var(--color-primary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* 其他月份日期 */
+:global(.react-calendar__month-view__days__day--neighboringMonth) {
+  color: var(--color-text-quaternary);
+  opacity: 0.4;
+}
+
+/* 有记录的格子 - 隐藏数字 */
 .hasLogTile {
   color: transparent !important;
-  /* Hide the number */
+  background: transparent !important;
 }
 
+/* 有记录且为今日 */
+.hasLogTile:global(.react-calendar__tile--now) {
+  background: transparent !important;
+}
+
+/* 有记录且被选中 */
 .hasLogTile:global(.react-calendar__tile--active) {
-  box-shadow: 0 0 0 2px var(--color-accent);
+  background: transparent !important;
+  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.3) !important;
 }
 
-/* Tile Image Content */
+/* Tile Image Content - 铺满格子 */
 .tileContent {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  right: 4px;
-  bottom: 4px;
-  border-radius: 10px;
+  inset: 0;
+  border-radius: 16px;
   overflow: hidden;
 }
 
+.tileImagesStack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .tileImg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+/* 单张图片 - 铺满 */
+.tileImg:only-child {
+  position: relative;
+}
+
+/* 多张图片 - 第一张铺满，其他显示小缩略图 */
+.tileImg:nth-child(1) {
+  position: relative;
+  z-index: 1;
+}
+
+.tileImg:nth-child(2) {
+  position: absolute;
+  width: 32%;
+  height: 32%;
+  bottom: 4px;
+  right: 4px;
+  border-radius: 6px;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.tileImg:nth-child(3) {
+  position: absolute;
+  width: 32%;
+  height: 32%;
+  bottom: 4px;
+  right: calc(32% + 8px);
+  border-radius: 6px;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
 .tilePlaceholder {
   width: 100%;
   height: 100%;
-  background: #f0f0f0;
+  background: rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px;
+  border-radius: 16px;
 }
 
 .tileBadge {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  background: var(--color-accent);
+  top: 4px;
+  right: 4px;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E53);
   color: white;
   font-size: 10px;
   font-weight: 700;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 }
 
 /* Summary Card */
@@ -319,11 +416,25 @@
   justify-content: center;
   cursor: pointer;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .deleteBtnFlat:hover {
   color: #ff4d4f;
   background: rgba(255, 77, 79, 0.1);
+}
+
+.deleteBtnConfirm {
+  background: #ff4d4f;
+  border: none;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Detail Modal Overlays */
@@ -380,6 +491,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.detailDeleteBtnConfirm {
+  background: #ff4d4f;
+  border: none;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* Reusing moment styles for detail modal */

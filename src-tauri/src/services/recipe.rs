@@ -74,6 +74,7 @@ impl RecipeService {
         name_zh: String,
         category: String,
         image_url: Option<String>,
+        details: Option<crate::models::CustomRecipeDetails>,
         pool: &SqlitePool
     ) -> Result<String, AppError> {
         // 业务规则：校验参数
@@ -85,7 +86,7 @@ impl RecipeService {
             return Err(AppError::Validation("Category cannot be empty".into()));
         }
         
-        RecipeRepository::create_custom(&name_zh, &category, image_url, pool).await
+        RecipeRepository::create_custom(&name_zh, &category, image_url, details, pool).await
     }
 
     /// 更新配方图片

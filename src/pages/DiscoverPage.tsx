@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
-import { Navbar, SearchBar, Tag, SectionTitle, CocktailCard } from '@/components';
+import { ChevronRight, Plus } from 'lucide-react';
+import { Navbar, SearchBar, SearchOverlay, InspirationSheet, Tag, SectionTitle, CocktailCard, AddRecordModal } from '@/components';
 import { useRecipeStore } from '@/stores/recipeStore';
 import type { Recipe } from '@/types';
 import styles from './DiscoverPage.module.css';
@@ -49,6 +49,11 @@ export function DiscoverPage() {
   const [selectedTaste, setSelectedTaste] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isInspirationOpen, setIsInspirationOpen] = useState(false);
+  const [inspirationCount, setInspirationCount] = useState<number | null>(null);
+  const [inspirationFallback, setInspirationFallback] = useState(false);
+  const [isAddRecipeModalOpen, setIsAddRecipeModalOpen] = useState(false);
 
   const { recipes, fetchRecipes } = useRecipeStore();
 
@@ -107,6 +112,15 @@ export function DiscoverPage() {
         subtitle=""
         showNotifications
         hasNotification
+        rightContent={
+          <button 
+            className={styles.addRecipeBtn} 
+            onClick={() => setIsAddRecipeModalOpen(true)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-primary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+          >
+            <Plus size={22} strokeWidth={2} />
+          </button>
+        }
       />
 
       <div className={styles.content}>
@@ -115,28 +129,74 @@ export function DiscoverPage() {
           value={searchQuery}
           onChange={setSearchQuery}
           className={styles.searchBar}
+          readonly
+          onClick={() => setIsSearchOpen(true)}
         />
 
-        {/* “今日灵感”卡片 */}
-        <div
-          className={styles.inspirationCard}
-          onClick={() => console.log('Navigate to recommendations')}
-        >
-          <div className={styles.inspirationBody}>
-            <div className={styles.iconArea}>
-              <span className={styles.iconEmoji}>🍸</span>
+        {/* 搜索 Overlay */}
+        {isSearchOpen && (
+          <SearchOverlay onClose={() => setIsSearchOpen(false)} />
+        )}
+
+        {/* 卡片并排容器 */}
+        <div className={styles.cardsRow}>
+          {/* "今日灵感"卡片 */}
+          <div
+            className={styles.inspirationCard}
+            onClick={() => setIsInspirationOpen(true)}
+          >
+            <div className={styles.inspirationBody}>
+              <div className={styles.iconArea}>
+                <span className={styles.iconEmoji}>🍸</span>
+              </div>
+              <div className={styles.inspirationText}>
+                <h2 className={styles.inspirationTitle}>今日灵感</h2>
+                <p className={styles.inspirationDesc}>
+                  {inspirationCount === null
+                    ? '发现可即刻调制的鸡尾酒'
+                    : inspirationFallback
+                    ? '先看看热门推荐吧'
+                    : `发现 ${inspirationCount} 款可调制`}
+                </p>
+                <span className={styles.inspirationLink}>
+                  查看推荐 <ChevronRight size={14} strokeWidth={2.5} />
+                </span>
+              </div>
             </div>
-            <div className={styles.inspirationText}>
-              <h2 className={styles.inspirationTitle}>今日灵感</h2>
-              <p className={styles.inspirationDesc}>
-                基于你的酒柜，发现 3 款可即刻调制的鸡尾酒
-              </p>
-              <span className={styles.inspirationLink}>
-                查看推荐 <ChevronRight size={14} strokeWidth={2.5} />
-              </span>
+          </div>
+
+          {/* AI 调酒师卡片 */}
+          <div
+            className={styles.aiBartenderCard}
+            onClick={() => navigate('/ai-bartender')}
+          >
+            <div className={styles.aiBartenderBody}>
+              <div className={styles.aiBartenderIcon}>
+                <span className={styles.aiBartenderEmoji}>🤖</span>
+              </div>
+              <div className={styles.aiBartenderText}>
+                <h2 className={styles.aiBartenderTitle}>AI 调酒师</h2>
+                <p className={styles.aiBartenderDesc}>
+                  分析心情和偏好专属调制
+                </p>
+                <span className={styles.aiBartenderLink}>
+                  召唤调酒师 <ChevronRight size={14} strokeWidth={2.5} />
+                </span>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* 今日灵感弹窗 */}
+        {isInspirationOpen && (
+          <InspirationSheet
+            onClose={() => setIsInspirationOpen(false)}
+            onCountReady={(count, fallback) => {
+              setInspirationCount(count);
+              setInspirationFallback(fallback);
+            }}
+          />
+        )}
 
         {/* 热门推荐 */}
         <div className={styles.section}>
@@ -222,6 +282,16 @@ export function DiscoverPage() {
           </div>
         )}
       </div>
+      
+      <AddRecordModal 
+        isOpen={isAddRecipeModalOpen}
+        onClose={() => setIsAddRecipeModalOpen(false)}
+        onSuccess={() => {
+          fetchRecipes();
+        }}
+        selectedDateStr=""
+        mode="recipe_only"
+      />
     </div>
   );
 }

@@ -160,6 +160,35 @@ export interface DBRecipeIngredientDetail {
   ingredient: Ingredient;
 }
 
+export interface CustomRecipeIngredientInput {
+  ingredientId: string;
+  amount: number;
+  unit: string;
+  note?: string;
+}
+
+export interface CustomRecipeDetails {
+  nameEn?: string;
+  description?: string;
+  method?: string;
+  glassType?: string;
+  difficulty?: number;
+  prepTime?: number;
+  baseSpirit?: string;
+  tags?: string[];
+  occasion?: string[];
+  season?: string[];
+  mood?: string[];
+  flavorProfile?: {
+    sweet: number;
+    sour: number;
+    bitter: number;
+    strong: number;
+  };
+  ingredients?: CustomRecipeIngredientInput[];
+  steps?: string[];
+}
+
 // ===== Ingredient =====
 
 export type IngredientCategory = 
@@ -245,6 +274,7 @@ export interface UserProfile {
   id: number;
   username: string;
   avatar: string | null;
+  bio?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -253,9 +283,120 @@ export interface UserStats {
   favoriteCount: number;
   historyCount: number;
   ratingCount: number;
+  // 后端返回 snake_case，兼容两种格式
+  favorite_count?: number;
+  history_count?: number;
+  rating_count?: number;
 }
 
 export interface UpdateProfileArgs {
   username?: string;
   avatar?: string;
+  bio?: string;
+}
+
+// ===== AI Bartender =====
+
+export type MBTIType = 
+  | 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP'
+  | 'INFJ' | 'INFP' | 'ENFJ' | 'ENFP'
+  | 'ISTJ' | 'ISFJ' | 'ESTJ' | 'ESFJ'
+  | 'ISTP' | 'ISFP' | 'ESTP' | 'ESFP';
+
+export type ZodiacType = 
+  | 'Aries' | 'Taurus' | 'Gemini' | 'Cancer'
+  | 'Leo' | 'Virgo' | 'Libra' | 'Scorpio'
+  | 'Sagittarius' | 'Capricorn' | 'Aquarius' | 'Pisces';
+
+export type WeatherType = 'sunny' | 'rainy' | 'cloudy' | 'snowy';
+
+export type MoodTag = 
+  | 'happy' | 'sad' | 'tired' | 'stressed' 
+  | 'relaxed' | 'excited' | 'romantic' | 'celebrate'
+  | 'lonely' | 'anxious' | 'bored' | 'creative';
+
+export interface UserProfileExtended extends UserProfile {
+  mbti: MBTIType | null;
+  zodiac: ZodiacType | null;
+  llm_api_key: string | null;
+  llm_model: string | null;
+  llm_base_url: string | null;
+}
+
+export interface RecommendationRequest {
+  moodTags: MoodTag[];
+  weather?: WeatherType;
+  temperature?: number;
+  useLlm: boolean;
+}
+
+export interface ScoreBreakdown {
+  inventory: number;
+  mood: number;
+  weather: number;
+  mbti: number;
+  zodiac: number;
+  memory: number;
+  total: number;
+}
+
+export interface MemoryContext {
+  totalRecommendations: number;
+  recentFavorites: string[];
+  preferenceSummary: string;
+}
+
+export interface RecommendationResponse {
+  recipe: DBRecipe;
+  score: number;
+  scoreBreakdown: ScoreBreakdown;
+  reason: string;
+  memoryContext: MemoryContext | null;
+  recommendationId: string;
+}
+
+export interface RecommendationFeedback {
+  recommendationId: string;
+  feedback: 1 | 0; // 1=喜欢, 0=不喜欢
+}
+
+export interface RecommendationHistory {
+  id: string;
+  userId: number;
+  recipeId: string;
+  moodTags: string; // JSON array
+  weather: string | null;
+  temperature: number | null;
+  mbti: string | null;
+  zodiac: string | null;
+  algorithmScore: number;
+  scoreBreakdown: string | null; // JSON object
+  llmReason: string | null;
+  llmModel: string | null;
+  userFeedback: number | null;
+  feedbackAt: number | null;
+  createdAt: number;
+}
+
+export interface TodoItemExtended {
+  id: string;
+  recipeId: string;
+  source: 'ai_bartender' | 'manual' | 'random' | 'discover';
+  moodContext: string | null; // JSON array
+  priority: number; // 0-5
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  createdAt: number;
+  completedAt: number | null;
+  notes: string | null;
+}
+
+export interface DailyRecommendationStats {
+  id: string;
+  userId: number;
+  dateStr: string;
+  totalRecommendations: number;
+  likes: number;
+  dislikes: number;
+  createdAt: number;
+  updatedAt: number;
 }

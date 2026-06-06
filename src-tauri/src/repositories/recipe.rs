@@ -242,6 +242,7 @@ impl RecipeRepository {
         name_zh: &str,
         category: &str,
         image_url: Option<String>,
+        details: Option<crate::models::CustomRecipeDetails>,
         pool: &SqlitePool
     ) -> Result<String, AppError> {
         let id = format!("r-{}", uuid::Uuid::new_v4());
@@ -250,25 +251,109 @@ impl RecipeRepository {
             .unwrap()
             .as_secs() as i64;
 
+        let mut name_en = None;
+        let mut description = None;
+        let mut method = None;
+        let mut glass_type = None;
+        let mut difficulty = Some(1);
+        let mut prep_time = None;
+        let mut tags_json = None;
+        let mut occasion_json = None;
+        let mut season_json = None;
+        let mut mood_json = None;
+        let mut flavor_profile_json = None;
+
+        if let Some(ref d) = details {
+            name_en = d.name_en.clone();
+            description = d.description.clone();
+            method = d.method.clone();
+            glass_type = d.glass_type.clone();
+            difficulty = d.difficulty;
+            prep_time = d.prep_time;
+            
+            if let Some(tags) = &d.tags { tags_json = serde_json::to_string(tags).ok(); }
+            if let Some(occ) = &d.occasion { occasion_json = serde_json::to_string(occ).ok(); }
+            if let Some(sea) = &d.season { season_json = serde_json::to_string(sea).ok(); }
+            if let Some(mood) = &d.mood { mood_json = serde_json::to_string(mood).ok(); }
+            if let Some(fp) = &d.flavor_profile { flavor_profile_json = serde_json::to_string(fp).ok(); }
+        }
+
+        let mut tx = pool.begin().await?;
+
         sqlx::query(
             r#"
             INSERT INTO recipes (
-                id, name_zh, category, image_url, source, difficulty, created_at, updated_at, view_count, is_favorite
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, name_zh, name_en, category, image_url, source, 
+                description, method, glass_type, difficulty, prep_time,
+                tags, occasion, season, mood, flavor_profile,
+                created_at, updated_at, view_count, is_favorite
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#
         )
         .bind(&id)
         .bind(name_zh)
+        .bind(&name_en)
         .bind(category)
         .bind(&image_url)
         .bind("custom")
-        .bind(1)
+        .bind(&description)
+        .bind(&method)
+        .bind(&glass_type)
+        .bind(difficulty)
+        .bind(prep_time)
+        .bind(&tags_json)
+        .bind(&occasion_json)
+        .bind(&season_json)
+        .bind(&mood_json)
+        .bind(&flavor_profile_json)
         .bind(current_time)
         .bind(current_time)
         .bind(0)
         .bind(true)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+        if let Some(d) = details {
+            if let Some(ingredients) = d.ingredients {
+                for ing in ingredients {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO recipe_ingredients (
+                            recipe_id, ingredient_id, amount, unit, is_optional, note
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        "#
+                    )
+                    .bind(&id)
+                    .bind(&ing.ingredient_id)
+                    .bind(ing.amount)
+                    .bind(&ing.unit)
+                    .bind(false)
+                    .bind(&ing.note)
+                    .execute(&mut *tx)
+                    .await?;
+                }
+            }
+
+            if let Some(steps) = d.steps {
+                for (index, text) in steps.iter().enumerate() {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO recipe_steps (
+                            recipe_id, step_order, text, duration_sec
+                        ) VALUES (?, ?, ?, ?)
+                        "#
+                    )
+                    .bind(&id)
+                    .bind((index + 1) as i32)
+                    .bind(text)
+                    .bind(0)
+                    .execute(&mut *tx)
+                    .await?;
+                }
+            }
+        }
+
+        tx.commit().await?;
 
         Ok(id)
     }

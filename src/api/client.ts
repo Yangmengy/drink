@@ -22,12 +22,18 @@ export const recipeApi = {
     apiInvoke<DBRecipeDetail | null>("get_recipe_by_id", { id }),
   search: (query: string) =>
     apiInvoke<DBRecipe[]>("search_recipes", { query }),
-  createCustom: (nameZh: string, category: string, imageUrl: string | null) =>
-    apiInvoke<string>("create_custom_recipe", { nameZh, category, imageUrl }),
+  createCustom: (nameZh: string, category: string, imageUrl: string | null, details?: import("../types").CustomRecipeDetails) =>
+    apiInvoke<string>("create_custom_recipe", { nameZh, category, imageUrl, details }),
   updateImage: (recipeId: string, imageUrl: string) =>
     apiInvoke<void>("update_recipe_image", { recipeId, imageUrl }),
   delete: (recipeId: string) =>
     apiInvoke<void>("delete_recipe", { recipeId }),
+  getFavorites: () =>
+    apiInvoke<DBRecipe[]>("get_favorite_recipes"),
+  getHistory: (limit?: number) =>
+    apiInvoke<DBRecipe[]>("get_recipe_history", { limit }),
+  toggleFavorite: (recipeId: string) =>
+    apiInvoke<boolean>("toggle_favorite", { recipeId }),
 };
 
 export const inventoryApi = {
@@ -39,6 +45,10 @@ export const inventoryApi = {
     apiInvoke<void>("add_to_inventory", { ingredientId }),
   remove: (ingredientId: string) =>
     apiInvoke<void>("remove_from_inventory", { ingredientId }),
+  addCustomIngredient: (nameZh: string) =>
+    apiInvoke<string>("create_custom_ingredient", { nameZh }),
+  getRecipesByInventory: () =>
+    apiInvoke<DBRecipe[]>("get_recipes_by_inventory"),
 };
 
 export const todoApi = {
@@ -62,6 +72,6 @@ export const imageApi = {
 export const userApi = {
   getProfile: () => apiInvoke<import("../types").UserProfile>("get_user_profile"),
   updateProfile: (args: import("../types").UpdateProfileArgs) => 
-    apiInvoke<import("../types").UserProfile>("update_user_profile", args as Record<string, unknown>),
+    apiInvoke<import("../types").UserProfile>("update_user_profile", { args }),
   getStats: () => apiInvoke<import("../types").UserStats>("get_user_stats"),
 };

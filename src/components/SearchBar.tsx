@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Search } from 'lucide-react';
 import styles from './SearchBar.module.css';
 
@@ -7,7 +8,9 @@ interface SearchBarProps {
   onChange?: (value: string) => void;
   readonly?: boolean;
   onClick?: () => void;
+  onFocus?: () => void;
   className?: string;
+  autoFocus?: boolean;
 }
 
 export function SearchBar({
@@ -16,13 +19,18 @@ export function SearchBar({
   onChange,
   readonly = false,
   onClick,
+  onFocus,
   className = '',
+  autoFocus = false,
 }: SearchBarProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className={`${styles.wrapper} ${className}`}>
       <div className={styles.inputGroup}>
         <Search size={15} strokeWidth={1.75} className={styles.icon} />
         <input
+          ref={inputRef}
           type="search"
           className={styles.input}
           placeholder={placeholder}
@@ -30,6 +38,8 @@ export function SearchBar({
           onChange={(e) => onChange?.(e.target.value)}
           readOnly={readonly}
           onClick={readonly ? onClick : undefined}
+          onFocus={onFocus}
+          autoFocus={autoFocus}
           enterKeyHint="search"
         />
       </div>

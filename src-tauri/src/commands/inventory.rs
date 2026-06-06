@@ -25,6 +25,11 @@ pub async fn get_all_ingredients(pool: State<'_, SqlitePool>) -> Result<Vec<Ingr
 }
 
 #[tauri::command]
+pub async fn create_custom_ingredient(name_zh: String, pool: State<'_, SqlitePool>) -> Result<String, AppError> {
+    InventoryService::create_custom_ingredient(name_zh, &pool).await
+}
+
+#[tauri::command]
 pub async fn get_ingredients_by_category(category: String, pool: State<'_, SqlitePool>) -> Result<Vec<Ingredient>, AppError> {
     InventoryService::get_ingredients_by_category(category, &pool).await
 }

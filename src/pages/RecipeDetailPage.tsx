@@ -261,12 +261,12 @@ export function RecipeDetailPage() {
         )}
 
         {/* Ingredients */}
-        {hasIngredients && (
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>配方原料</h2>
-              {totalCount > 0 && <span className={styles.sectionSubtitle}>拥有 {ownedCount}/{totalCount}</span>}
-            </div>
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>配方原料</h2>
+            {totalCount > 0 && <span className={styles.sectionSubtitle}>拥有 {ownedCount}/{totalCount}</span>}
+          </div>
+          {hasIngredients ? (
             <div className={styles.ingredientList}>
               {currentRecipe.ingredients.map((ingredient, index) => (
                 <div 
@@ -290,13 +290,15 @@ export function RecipeDetailPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ color: 'var(--color-text-tertiary)', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>暂无配方原料</div>
+          )}
+        </div>
 
         {/* Steps - Horizontal Cards */}
-        {hasSteps && (
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>制作步骤</h2>
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>制作步骤</h2>
+          {hasSteps ? (
             <div className={styles.stepsCarousel}>
               {currentRecipe.steps.map((step, index) => (
                 <div key={index} className={styles.stepCard}>
@@ -313,8 +315,10 @@ export function RecipeDetailPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ color: 'var(--color-text-tertiary)', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>暂无制作步骤</div>
+          )}
+        </div>
 
         {/* Pairing Showcase */}
         {currentRecipe.pairing && (currentRecipe.pairing.food?.length > 0 || currentRecipe.pairing.music?.length > 0) && (

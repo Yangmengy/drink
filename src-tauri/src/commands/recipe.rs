@@ -80,9 +80,10 @@ pub async fn create_custom_recipe(
     name_zh: String,
     category: String,
     image_url: Option<String>,
+    details: Option<crate::models::CustomRecipeDetails>,
     pool: State<'_, SqlitePool>,
 ) -> Result<String, AppError> {
-    RecipeService::create_custom(name_zh, category, image_url, &pool).await
+    RecipeService::create_custom(name_zh, category, image_url, details, &pool).await
 }
 
 #[tauri::command]

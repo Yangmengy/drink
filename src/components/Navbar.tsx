@@ -7,6 +7,7 @@ interface NavbarProps {
   showNotifications?: boolean;
   hasNotification?: boolean;
   compact?: boolean;
+  rightContent?: React.ReactNode;
 }
 
 export function Navbar({
@@ -15,6 +16,7 @@ export function Navbar({
   showNotifications = true,
   hasNotification = false,
   compact = false,
+  rightContent,
 }: NavbarProps) {
   return (
     <header className={`${styles.navbar} ${compact ? styles.compact : ''}`}>
@@ -23,14 +25,15 @@ export function Navbar({
           <h1 className={styles.appName}>{title}</h1>
           {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
         </div>
-        {showNotifications && (
-          <div className={styles.actions}>
+        <div className={styles.actions}>
+          {rightContent}
+          {showNotifications && (
             <button className={styles.iconBtn} aria-label="通知">
               <Bell size={15} strokeWidth={1.75} />
               {hasNotification && <span className={styles.notificationDot} />}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

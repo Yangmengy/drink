@@ -14,6 +14,7 @@ export function RecordPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[] | null>(null);
   const [detailLog, setDetailLog] = useState<DrinkLog | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   const { logs, fetchLogs, deleteLog, loading } = useLogStore();
   const { username, avatar } = useUserStore();
@@ -51,24 +52,48 @@ export function RecordPage() {
       const dStr = format(date, 'yyyy-MM-dd');
       const dayLogs = logsByDate.get(dStr);
       if (dayLogs && dayLogs.length > 0) {
-        const firstLog = dayLogs[0];
-        let coverImg = firstLog.recipe?.image_url;
-        if (firstLog.images) {
-          try {
-            const imgs = JSON.parse(firstLog.images);
-            if (imgs && imgs.length > 0) {
-              coverImg = imgs[0];
-            }
-          } catch (e) {}
+        // 收集最多3张图片用于堆叠展示
+        const images: string[] = [];
+        
+        for (const log of dayLogs) {
+          if (images.length >= 3) break;
+          
+          // 优先使用用户上传的图片
+          if (log.images) {
+            try {
+              const imgs = JSON.parse(log.images);
+              if (imgs && imgs.length > 0) {
+                images.push(imgs[0]);
+                continue;
+              }
+            } catch (e) {}
+          }
+          
+          // 备用：使用配方图片
+          if (log.recipe?.image_url) {
+            images.push(log.recipe.image_url);
+          }
+        }
+
+        if (images.length === 0) {
+          // 没有图片，显示占位符
+          return (
+            <div className={styles.tileContent}>
+              <div className={styles.tilePlaceholder}>🍸</div>
+              {dayLogs.length > 1 && (
+                <div className={styles.tileBadge}>{dayLogs.length}</div>
+              )}
+            </div>
+          );
         }
 
         return (
           <div className={styles.tileContent}>
-            {coverImg ? (
-              <img src={coverImg} alt="drink" className={styles.tileImg} />
-            ) : (
-              <div className={styles.tilePlaceholder}>🍸</div>
-            )}
+            <div className={styles.tileImagesStack}>
+              {images.map((img, idx) => (
+                <img key={idx} src={img} alt="drink" className={styles.tileImg} />
+              ))}
+            </div>
             {dayLogs.length > 1 && (
               <div className={styles.tileBadge}>{dayLogs.length}</div>
             )}
@@ -83,13 +108,19 @@ export function RecordPage() {
     fetchLogs();
   };
 
-  const handleDelete = async (e: React.MouseEvent, logId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, logId: string) => {
     e.stopPropagation();
-    if (window.confirm('确定要删除这条记录吗？')) {
-      await deleteLog(logId);
-      if (detailLog?.id === logId) {
-        setDetailLog(null);
-      }
+    setConfirmDeleteId(logId);
+    // 3秒后自动取消确认状态
+    setTimeout(() => setConfirmDeleteId((cur) => (cur === logId ? null : cur)), 3000);
+  };
+
+  const handleDeleteConfirm = async (e: React.MouseEvent, logId: string) => {
+    e.stopPropagation();
+    setConfirmDeleteId(null);
+    await deleteLog(logId);
+    if (detailLog?.id === logId) {
+      setDetailLog(null);
     }
   };
 
@@ -118,6 +149,7 @@ export function RecordPage() {
             locale="zh-CN"
             next2Label={null}
             prev2Label={null}
+            formatDay={(_locale, date) => date.getDate().toString()}
             tileContent={tileContent}
             tileClassName={({ date }) => {
               const dStr = format(date, 'yyyy-MM-dd');
@@ -189,12 +221,21 @@ export function RecordPage() {
                           </div>
                         )}
                       </div>
-                      <button 
-                        className={styles.deleteBtnFlat} 
-                        onClick={(e) => handleDelete(e, log.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {confirmDeleteId === log.id ? (
+                        <button
+                          className={styles.deleteBtnConfirm}
+                          onClick={(e) => handleDeleteConfirm(e, log.id)}
+                        >
+                          确认删除
+                        </button>
+                      ) : (
+                        <button
+                          className={styles.deleteBtnFlat}
+                          onClick={(e) => handleDeleteClick(e, log.id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
 
                     {log.notes && (
@@ -269,12 +310,21 @@ export function RecordPage() {
                   )}
                 </div>
               </div>
-              <button 
-                className={styles.detailDeleteBtn} 
-                onClick={(e) => handleDelete(e, detailLog.id)}
-              >
-                <Trash2 size={18} />
-              </button>
+              {confirmDeleteId === detailLog.id ? (
+                <button
+                  className={styles.detailDeleteBtnConfirm}
+                  onClick={(e) => handleDeleteConfirm(e, detailLog.id)}
+                >
+                  确认删除
+                </button>
+              ) : (
+                <button
+                  className={styles.detailDeleteBtn}
+                  onClick={(e) => handleDeleteClick(e, detailLog.id)}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
             
             <div className={styles.momentContent}>

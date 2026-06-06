@@ -4,6 +4,7 @@
 mod commands;
 mod db;
 mod models;
+mod recommendation;
 pub mod error;
 pub mod repositories;
 pub mod services;
@@ -26,8 +27,13 @@ async fn main() {
         Err(e) => println!("Database health check error: {}", e),
     }
 
+    let session_service = std::sync::Arc::new(
+        init_session_service().await.expect("Failed to initialize chat session service")
+    );
+
     tauri::Builder::default()
         .manage(pool)
+        .manage(session_service)
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             // 配方相关命令
@@ -44,13 +50,14 @@ async fn main() {
             add_to_history,
             
             // 库存相关命令
-            get_inventory,
-            add_to_inventory,
-            remove_from_inventory,
-            get_all_ingredients,
-            get_ingredients_by_category,
-            search_ingredients,
-            get_recipes_by_inventory,
+            commands::inventory::get_inventory,
+            commands::inventory::add_to_inventory,
+            commands::inventory::remove_from_inventory,
+            commands::inventory::get_all_ingredients,
+            commands::inventory::create_custom_ingredient,
+            commands::inventory::get_ingredients_by_category,
+            commands::inventory::search_ingredients,
+            commands::inventory::get_recipes_by_inventory,
             
             // 图片相关命令
             get_image_url,
@@ -71,6 +78,21 @@ async fn main() {
             get_user_profile,
             update_user_profile,
             get_user_stats,
+            
+            // AI 调酒师命令
+            get_ai_recommendation,
+            submit_recommendation_feedback,
+            add_to_todo_from_ai,
+            get_todo_list_extended,
+            update_todo_status,
+            update_user_personality,
+            update_llm_config,
+            get_user_recommendation_history,
+            
+            // Chat commands
+            send_chat_message,
+            get_chat_history,
+            clear_chat_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

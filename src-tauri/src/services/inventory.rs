@@ -22,6 +22,10 @@ impl InventoryService {
         InventoryRepository::get_all_ingredients(pool).await
     }
 
+    pub async fn create_custom_ingredient(name_zh: String, pool: &SqlitePool) -> Result<String, AppError> {
+        InventoryRepository::create_custom_ingredient(name_zh, pool).await
+    }
+
     pub async fn get_ingredients_by_category(category: String, pool: &SqlitePool) -> Result<Vec<Ingredient>, AppError> {
         InventoryRepository::get_ingredients_by_category(category, pool).await
     }

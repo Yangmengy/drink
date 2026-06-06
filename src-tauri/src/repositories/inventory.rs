@@ -60,6 +60,33 @@ impl InventoryRepository {
         Ok(ingredients)
     }
 
+    pub async fn create_custom_ingredient(name_zh: String, pool: &SqlitePool) -> Result<String, AppError> {
+        // Check if exists first
+        if let Ok(existing) = sqlx::query_as::<_, Ingredient>("SELECT * FROM ingredients WHERE name_zh = ?")
+            .bind(&name_zh)
+            .fetch_one(pool)
+            .await 
+        {
+            return Ok(existing.id);
+        }
+
+        let id = uuid::Uuid::new_v4().to_string();
+        let current_time = chrono::Utc::now().timestamp();
+        
+        sqlx::query(
+            "INSERT INTO ingredients (id, name_zh, category, created_at, updated_at) 
+             VALUES (?, ?, 'other', ?, ?)"
+        )
+        .bind(&id)
+        .bind(&name_zh)
+        .bind(current_time)
+        .bind(current_time)
+        .execute(pool)
+        .await?;
+        
+        Ok(id)
+    }
+
     pub async fn get_ingredients_by_category(category: String, pool: &SqlitePool) -> Result<Vec<Ingredient>, AppError> {
         let ingredients = sqlx::query_as::<_, Ingredient>(
             "SELECT * FROM ingredients WHERE category = ? ORDER BY name_zh"

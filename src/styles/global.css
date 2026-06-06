@@ -59,6 +59,22 @@ body::before {
 
   /* 模拟强模糊效果 */
   filter: blur(0px);
+  
+  /* 平滑过渡 */
+  transition: background 0.5s ease-out;
+}
+
+/* 自定义背景图片 */
+body[data-custom-background="true"]::before {
+  background: var(--custom-background-image) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 自定义预设背景 */
+body[data-preset-background]::before {
+  background: var(--preset-background) !important;
 }
 
 /* 深色模式背景 */

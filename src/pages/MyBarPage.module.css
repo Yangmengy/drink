@@ -4,13 +4,16 @@
   flex-direction: column;
   background: var(--color-bg-primary);
   padding-bottom: calc(56px + env(safe-area-inset-bottom)); /* TabBar 高度 */
-  overflow: hidden;
+  overflow: hidden; /* 防止整页滚动 */
+  height: 100vh;
+  height: 100dvh;
 }
 
 .searchContainer {
   padding: 15px 20px 15px;
   background: var(--color-bg-primary);
   z-index: 10;
+  flex-shrink: 0; /* 防止搜索栏被压缩 */
 }
 
 .searchBar {
@@ -43,20 +46,23 @@
 .layout {
   flex: 1;
   display: flex;
-  overflow: hidden;
+  overflow: hidden; /* 防止布局容器滚动 */
   position: relative;
+  min-height: 0; /* 重要：允许 flex 子元素缩小 */
 }
 
 /* Sidebar */
 .sidebar {
   width: 85px;
   background: rgba(255,255,255,0.5);
-  overflow-y: auto;
+  overflow-y: auto; /* 分类栏自己可以滚动 */
+  overflow-x: hidden;
   border-right: 1px solid rgba(0,0,0,0.03);
   padding: 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0; /* 不会被压缩 */
 }
 
 .sidebar::-webkit-scrollbar {
@@ -86,9 +92,11 @@
 /* Right List */
 .listContainer {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 只有这里滚动 */
+  overflow-x: hidden;
   padding: 16px;
   background: var(--color-bg-primary);
+  min-width: 0; /* 防止内容溢出 */
 }
 
 .loading {
@@ -101,6 +109,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  /* 使用 grid 自动对齐同一行的高度 */
+  align-items: stretch;
 }
 
 .ingredientCard {
@@ -116,6 +126,7 @@
   cursor: pointer;
   border: 1px solid transparent;
   text-align: center;
+  /* 移除固定高度，让内容自适应 */
   height: 100%;
 }
 
@@ -170,14 +181,24 @@
 .name {
   width: 100%;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.4;
   color: var(--color-text-primary);
   margin-bottom: 2px;
+  text-align: center;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  /* 让文本自动换行，最多3行 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  /* 确保文字区域有足够空间 */
+  min-height: 36px;
+  /* 垂直居中 */
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  white-space: nowrap;
 }
 
 .category {

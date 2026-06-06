@@ -117,12 +117,17 @@ export function MyBarPage() {
                       <div 
                         className={styles.name}
                         style={{ 
-                          fontSize: ingredient.name_zh.length >= 7 ? '10px' : ingredient.name_zh.length === 6 ? '11px' : '13px'
+                          fontSize: 
+                            ingredient.name_zh.length > 20 ? '8px' : 
+                            ingredient.name_zh.length > 15 ? '9px' : 
+                            ingredient.name_zh.length > 12 ? '10px' : 
+                            ingredient.name_zh.length > 8 ? '11px' : 
+                            ingredient.name_zh.length > 5 ? '12px' : '13px',
+                          lineHeight: ingredient.name_zh.length > 12 ? '1.3' : '1.4'
                         }}
                       >
                         {ingredient.name_zh}
                       </div>
-                      <div className={styles.category}>{categoryNames[ingredient.category] || ingredient.category}</div>
                     </div>
                   </div>
                 );

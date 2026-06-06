@@ -113,7 +113,19 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: 12px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.label:first-child {
+  margin-top: 0;
+}
+
+.labelHint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: normal;
+  margin-left: 6px;
 }
 
 /* Select Grid */
@@ -181,7 +193,7 @@
 .input, .select, .textarea {
   width: 100%;
   background: var(--color-bg-secondary);
-  border: 1px solid transparent;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 15px;
@@ -206,17 +218,23 @@
   margin: 20px 0;
 }
 
-.ratingStars {
+.rating {
   display: flex;
   gap: 12px;
 }
 
-.starIcon {
+.starBtn {
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.1s;
 }
 
-.starIcon:active {
+.starBtn:active {
   transform: scale(0.8);
 }
 
@@ -252,14 +270,16 @@
   height: 20px;
   border-radius: 50%;
   background: rgba(0,0,0,0.6);
-  border: none;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .addBox {
+  position: relative;
   aspect-ratio: 1;
   border-radius: 8px;
   background: var(--color-bg-secondary);
@@ -268,4 +288,218 @@
   justify-content: center;
   cursor: pointer;
   border: 1px dashed rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+
+.addBox:hover {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Accordion Styles */
+.accordionContainer {
+  margin-top: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.accordionToggle {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.accordionToggle:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.accordionArrow {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.accordionContent {
+  padding: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.textareaSmall {
+  width: 100%;
+  min-height: 60px;
+  background: var(--color-bg-secondary);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.textareaSmall:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.inputRow {
+  display: flex;
+  gap: 12px;
+}
+
+.inputRow .inputGroup {
+  flex: 1;
+}
+
+.rangeInput {
+  width: 100%;
+  accent-color: #6C5CE7;
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.rangeValue {
+  font-size: 12px;
+  color: #6C5CE7;
+  text-align: right;
+  font-weight: 500;
+}
+
+.flavorSection {
+  margin-top: 4px;
+}
+
+.flavorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+  margin-top: 8px;
+}
+
+.flavorItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flavorItem span {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.flavorItem input {
+  accent-color: #A29BFE;
+  height: 3px;
+}
+
+/* Dynamic Lists (Ingredients & Steps) */
+.dynamicListSection {
+  margin-top: 16px;
+}
+
+.dynamicListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dynamicListHeader .label {
+  margin: 0;
+}
+
+.addListBtn {
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.addListBtn:hover {
+  background: rgba(78, 205, 196, 0.1);
+}
+
+.dynamicListItemRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.selectSmall, .inputSmall {
+  background: var(--color-bg-secondary);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.inputName {
+  flex: 2;
+}
+
+.inputAmount {
+  flex: 1;
+  max-width: 70px;
+}
+
+.inputUnit {
+  flex: 1;
+  max-width: 70px;
+}
+
+.selectSmall:focus, .inputSmall:focus {
+  border-color: var(--color-accent);
+}
+
+.deleteListBtn {
+  background: transparent;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.deleteListBtn:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.stepNum {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  width: 16px;
+  text-align: right;
 }

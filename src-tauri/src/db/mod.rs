@@ -29,6 +29,16 @@ pub async fn init_database() -> Result<SqlitePool> {
     // 向后兼容迁移：尝试给 drink_logs 添加 images 字段
     let _ = sqlx::query("ALTER TABLE drink_logs ADD COLUMN images TEXT").execute(&pool).await;
     
+    // 向后兼容迁移：尝试给 user_profile 添加 bio 字段
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN bio TEXT").execute(&pool).await;
+    
+    // AI 调酒师相关字段
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN mbti TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN zodiac TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_api_key TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_model TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_base_url TEXT").execute(&pool).await;
+    
     // 检查是否需要初始化数据
     let count: i64 = sqlx::query("SELECT COUNT(*) as count FROM recipes")
         .fetch_one(&pool)
