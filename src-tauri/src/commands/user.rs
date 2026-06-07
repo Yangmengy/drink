@@ -16,6 +16,8 @@ pub struct UserProfile {
     pub bio: Option<String>,
     pub mbti: Option<String>,
     pub zodiac: Option<String>,
+    pub current_mood: Option<String>,
+    pub current_weather: Option<String>,
     pub llm_api_key: Option<String>,
     pub llm_model: Option<String>,
     pub llm_base_url: Option<String>,
@@ -45,7 +47,7 @@ pub struct UpdateProfileArgs {
 #[tauri::command]
 pub async fn get_user_profile(pool: State<'_, SqlitePool>) -> Result<UserProfile, AppError> {
     let profile = sqlx::query_as::<sqlx::Sqlite, UserProfile>(
-        "SELECT id, username, avatar, bio, mbti, zodiac, llm_api_key, llm_model, llm_base_url, created_at, updated_at FROM user_profile WHERE id = 1"
+        "SELECT id, username, avatar, bio, mbti, zodiac, current_mood, current_weather, llm_api_key, llm_model, llm_base_url, created_at, updated_at FROM user_profile WHERE id = 1"
     )
     .fetch_one(pool.inner())
     .await
@@ -115,4 +117,25 @@ pub async fn get_user_stats(pool: State<'_, SqlitePool>) -> Result<UserStats, Ap
         history_count,
         rating_count,
     })
+}
+
+/// 更新用户当前心情和天气
+#[tauri::command]
+pub async fn update_mood_weather(
+    mood: Option<String>,
+    weather: Option<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), AppError> {
+    let now = chrono::Utc::now().timestamp();
+
+    sqlx::query(
+        "UPDATE user_profile SET current_mood = ?, current_weather = ?, updated_at = ? WHERE id = 1"
+    )
+    .bind(mood)
+    .bind(weather)
+    .bind(now)
+    .execute(pool.inner())
+    .await?;
+
+    Ok(())
 }

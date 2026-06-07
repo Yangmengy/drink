@@ -1,0 +1,83 @@
+<!--pages/search/search.wxml-->
+<view class="page">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrapper">
+      <input 
+        class="search-input"
+        type="text"
+        placeholder="搜索鸡尾酒名称、原料..."
+        value="{{searchValue}}"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchSubmit"
+        focus
+      />
+      <view class="search-btn" bindtap="onSearchSubmit">搜索</view>
+    </view>
+  </view>
+
+  <!-- 搜索结果 -->
+  <view wx:if="{{results.length > 0}}" class="results-section">
+    <view class="section-title">搜索结果 ({{results.length}})</view>
+    <view 
+      wx:for="{{results}}" 
+      wx:key="id"
+      class="result-item"
+      data-id="{{item.id}}"
+      bindtap="goToRecipe"
+    >
+      <image 
+        class="result-image" 
+        src="{{item.image_url || '/images/placeholder-cocktail.png'}}"
+        mode="aspectFill"
+      />
+      <view class="result-info">
+        <view class="result-name">{{item.name_zh}}</view>
+        <view class="result-desc">{{item.description}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 无搜索结果时显示历史和热门 -->
+  <view wx:else class="suggestions">
+    <!-- 搜索历史 -->
+    <view wx:if="{{history.length > 0}}" class="history-section">
+      <view class="section-header">
+        <view class="section-title">🕐 搜索历史</view>
+        <view class="clear-btn" bindtap="clearHistory">清空</view>
+      </view>
+      <view class="tags-list">
+        <view 
+          wx:for="{{history}}" 
+          wx:key="*this"
+          class="tag"
+          data-keyword="{{item}}"
+          bindtap="onHistoryClick"
+        >
+          {{item}}
+        </view>
+      </view>
+    </view>
+
+    <!-- 热门搜索 -->
+    <view class="hot-section">
+      <view class="section-title">🔥 热门搜索</view>
+      <view class="tags-list">
+        <view 
+          wx:for="{{hotKeywords}}" 
+          wx:key="*this"
+          class="tag hot"
+          data-keyword="{{item}}"
+          bindtap="onHotKeywordClick"
+        >
+          {{item}}
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索中 -->
+  <view wx:if="{{searching}}" class="loading">
+    <text>搜索中...</text>
+  </view>
+</view>

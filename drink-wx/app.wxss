@@ -1,0 +1,159 @@
+/**app.wxss - iOS 毛玻璃设计系统**/
+page {
+  /* ========== 品牌色 ========== */
+  --color-accent: #4ECDC4;
+  --color-accent-hover: #3DBDB5;
+  --color-accent-light: rgba(78, 205, 196, 0.12);
+  --color-rose: #FF6B6B;
+  --color-rose-light: rgba(255, 107, 107, 0.1);
+  
+  /* ========== 文字 ========== */
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-quaternary: #BBBBBB;
+  --text-inverse: #FFFFFF;
+  
+  /* ========== 背景 ========== */
+  --bg-root: #F5F2EF;
+  --bg-primary: #F5F2EF;
+  --bg-secondary: #FFFFFF;
+  --bg-elevated: rgba(255, 255, 255, 0.78);
+  --bg-glass: rgba(255, 255, 255, 0.64);
+  --bg-glass-heavy: rgba(255, 255, 255, 0.88);
+  --bg-search: rgba(0, 0, 0, 0.04);
+  
+  /* ========== 分割线 ========== */
+  --divider: rgba(0, 0, 0, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.35);
+  
+  /* ========== 间距 ========== */
+  --spacing-xxs: 6rpx;
+  --spacing-xs: 12rpx;
+  --spacing-sm: 20rpx;
+  --spacing-md: 28rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 40rpx;
+  --spacing-xxl: 52rpx;
+  --spacing-xxxl: 80rpx;
+  
+  /* ========== 圆角 ========== */
+  --radius-sm: 20rpx;
+  --radius-md: 28rpx;
+  --radius-lg: 36rpx;
+  --radius-xl: 44rpx;
+  --radius-xxl: 52rpx;
+  --radius-full: 9999rpx;
+  
+  /* ========== 阴影 ========== */
+  --shadow-xs: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8rpx 36rpx rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 12rpx 48rpx rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20rpx 72rpx rgba(0, 0, 0, 0.1);
+  
+  /* ========== 动画 ========== */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-normal: 350ms;
+  --duration-slow: 500ms;
+  
+  background-color: var(--bg-root);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* 通用容器 */
+.container {
+  padding: var(--spacing-md);
+}
+
+/* 毛玻璃卡片样式 */
+.card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-md);
+  border: 1px solid var(--border-glass);
+}
+
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(48rpx) saturate(180%);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* 按钮样式 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 32rpx;
+  border-radius: var(--radius-medium);
+  font-size: 28rpx;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 2rpx solid var(--border-color);
+}
+
+/* 文本样式 */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.text-accent {
+  color: var(--primary-color);
+}
+
+/* 加载状态 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+  color: var(--text-tertiary);
+}
+
+/* 空状态 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 0;
+  color: var(--text-tertiary);
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.3;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: var(--text-tertiary);
+}

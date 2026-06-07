@@ -1,0 +1,330 @@
+/* pages/record/record.wxss - 1:1 复原记录页设计 */
+
+.page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding-bottom: 160rpx;
+}
+
+/* ========== 导航栏 ========== */
+.navbar {
+  padding: 24rpx 40rpx;
+  background: var(--bg-page);
+}
+
+.navbar-title {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.navbar-subtitle {
+  font-size: 22rpx;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  margin-top: 4rpx;
+}
+
+/* ========== 内容区 ========== */
+.content {
+  padding: 0 40rpx;
+}
+
+/* ========== 毛玻璃卡片 ========== */
+.glass-card {
+  background: var(--bg-elevated);
+  backdrop-filter: blur(48rpx) saturate(180%);
+  border-radius: var(--radius-large);
+  border: 1rpx solid var(--border-glass);
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s ease;
+}
+
+/* ========== 日历卡片 ========== */
+.calendar-card {
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.calendar-icon {
+  font-size: 32rpx;
+}
+
+.calendar-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.date-picker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-medium);
+}
+
+.date-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.picker-arrow {
+  font-size: 48rpx;
+  font-weight: 300;
+  color: var(--text-tertiary);
+  line-height: 1;
+}
+
+/* ========== 统计卡片 ========== */
+.summary-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+}
+
+.summary-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.summary-label {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.summary-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+}
+
+.summary-count {
+  font-size: 64rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.summary-unit {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.summary-icon {
+  font-size: 80rpx;
+  opacity: 0.3;
+}
+
+/* ========== 区块标题 ========== */
+.section {
+  margin-bottom: 32rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.record-count {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: white;
+  font-size: 22rpx;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+/* ========== 记录列表 ========== */
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.record-card {
+  padding: 32rpx;
+}
+
+.record-card:active {
+  transform: scale(0.98);
+}
+
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.record-drink {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.drink-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.drink-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-time {
+  font-size: 22rpx;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+.record-notes {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.record-rating {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.star-icon {
+  font-size: 24rpx;
+}
+
+.rating-value {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.record-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--border-glass);
+}
+
+.delete-btn {
+  padding: 8rpx 24rpx;
+  background: rgba(255, 77, 79, 0.1);
+  color: #ff4d4f;
+  font-size: 24rpx;
+  font-weight: 600;
+  border-radius: 32rpx;
+}
+
+.delete-btn:active {
+  background: rgba(255, 77, 79, 0.2);
+}
+
+/* ========== 空状态 ========== */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 40rpx;
+  text-align: center;
+}
+
+.empty-emoji {
+  font-size: 120rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.4;
+}
+
+.empty-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.empty-desc {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+}
+
+/* ========== 加载状态 ========== */
+.loading {
+  text-align: center;
+  padding: 80rpx 40rpx;
+  font-size: 28rpx;
+  color: var(--text-tertiary);
+}
+
+/* ========== 悬浮按钮 ========== */
+.fab {
+  position: fixed;
+  bottom: 40rpx;
+  right: 40rpx;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  box-shadow: 0 8rpx 32rpx rgba(78, 205, 196, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.fab:active {
+  transform: scale(0.9);
+}
+
+.fab-icon {
+  font-size: 64rpx;
+  font-weight: 300;
+  line-height: 1;
+}

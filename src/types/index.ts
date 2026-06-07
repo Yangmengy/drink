@@ -295,7 +295,14 @@ export interface UpdateProfileArgs {
   bio?: string;
 }
 
-// ===== AI Bartender =====
+// ===== AI Bartender Chat =====
+
+export interface ChatMessagePayload {
+  id: string;
+  role: string;
+  text: string;
+  recipes: DBRecipe[];
+}
 
 export type MBTIType = 
   | 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP'
@@ -318,6 +325,8 @@ export type MoodTag =
 export interface UserProfileExtended extends UserProfile {
   mbti: MBTIType | null;
   zodiac: ZodiacType | null;
+  current_mood: string | null;
+  current_weather: string | null;
   llm_api_key: string | null;
   llm_model: string | null;
   llm_base_url: string | null;

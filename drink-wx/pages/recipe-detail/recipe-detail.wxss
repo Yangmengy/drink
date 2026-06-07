@@ -1,0 +1,367 @@
+/* pages/recipe-detail/recipe-detail.wxss - 1:1 复原配方详情页 */
+
+.page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding-bottom: 120rpx;
+}
+
+/* ========== 返回按钮 ========== */
+.back-btn {
+  position: fixed;
+  top: 24rpx;
+  left: 24rpx;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.back-btn:active {
+  transform: scale(0.9);
+}
+
+.back-icon {
+  font-size: 56rpx;
+  font-weight: 300;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* ========== 配方图片 ========== */
+.image-container {
+  position: relative;
+  width: 100%;
+  height: 500rpx;
+  overflow: hidden;
+}
+
+.recipe-image {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 200rpx;
+  background: linear-gradient(145deg, rgba(78, 205, 196, 0.08), rgba(255, 107, 107, 0.06));
+}
+
+.image-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200rpx;
+  background: linear-gradient(to top, var(--bg-page), transparent);
+}
+
+/* ========== 内容区域 ========== */
+.content {
+  padding: 0 40rpx;
+  margin-top: -120rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== 毛玻璃卡片 ========== */
+.glass-card {
+  background: var(--bg-elevated);
+  backdrop-filter: blur(48rpx) saturate(180%);
+  border-radius: var(--radius-large);
+  border: 1rpx solid var(--border-glass);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 24rpx;
+}
+
+/* ========== 头部卡片 ========== */
+.header-card {
+  padding: 32rpx;
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24rpx;
+}
+
+.title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-name {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 8rpx;
+}
+
+.recipe-name-en {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  text-transform: capitalize;
+  letter-spacing: 0.05em;
+}
+
+.favorite-btn {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.heart-icon {
+  font-size: 48rpx;
+  color: #FF6B6B;
+  line-height: 1;
+}
+
+/* ========== 信息行 ========== */
+.info-row {
+  display: flex;
+  gap: 24rpx;
+}
+
+.info-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-medium);
+}
+
+.info-icon {
+  font-size: 32rpx;
+}
+
+.info-label {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ========== 区块卡片 ========== */
+.section-card {
+  padding: 32rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 24rpx;
+  letter-spacing: -0.01em;
+}
+
+/* ========== 描述文本 ========== */
+.description-text {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ========== 原料列表 ========== */
+.ingredients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.ingredient-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-medium);
+}
+
+.ingredient-info {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.ingredient-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.ingredient-name {
+  font-size: 28rpx;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.ingredient-amount {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+
+/* ========== 步骤列表 ========== */
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.step-row {
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.step-number {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: white;
+  font-size: 24rpx;
+  font-weight: 700;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.step-text {
+  flex: 1;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  padding-top: 8rpx;
+}
+
+/* ========== 信息网格 ========== */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.info-block {
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-medium);
+  text-align: center;
+}
+
+.info-block-label {
+  font-size: 22rpx;
+  color: var(--text-tertiary);
+  margin-bottom: 8rpx;
+}
+
+.info-block-value {
+  font-size: 28rpx;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ========== 操作栏 ========== */
+.action-bar {
+  display: flex;
+  gap: 16rpx;
+  padding: 24rpx;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 24rpx;
+  background: white;
+  border-radius: var(--radius-large);
+  border: 1rpx solid var(--border-glass);
+  transition: all 0.3s ease;
+}
+
+.action-btn.primary {
+  background: var(--color-accent);
+}
+
+.action-btn:active {
+  transform: scale(0.97);
+}
+
+.btn-icon {
+  font-size: 40rpx;
+}
+
+.btn-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.action-btn.primary .btn-text {
+  color: white;
+}
+
+/* ========== 加载和错误状态 ========== */
+.loading,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 40rpx;
+  text-align: center;
+}
+
+.loading {
+  font-size: 28rpx;
+  color: var(--text-tertiary);
+}
+
+.error-emoji {
+  font-size: 120rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.4;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: var(--text-tertiary);
+  margin-bottom: 32rpx;
+}
+
+.retry-btn {
+  padding: 16rpx 48rpx;
+  background: var(--color-accent);
+  color: white;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 36rpx;
+  border: none;
+}

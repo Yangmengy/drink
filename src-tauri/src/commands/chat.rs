@@ -5,11 +5,14 @@ use adk_rust::Content;
 use adk_rust::model::openai::{OpenAIClient, OpenAIConfig};
 use adk_rust::runner::{Runner, RunnerConfig};
 use adk_rust::futures::StreamExt;
-use adk_session::{DeleteRequest, GetRequest, SessionService, SqliteSessionService};
-use sqlx::{Pool, Sqlite};
+use adk_session::{CreateRequest, DeleteRequest, GetRequest, SessionService, SqliteSessionService};
+use adk_memory::{MemoryService, SqliteMemoryService, MemoryEntry, SearchRequest};
+use std::collections::HashMap;
+use sqlx::{Pool, Sqlite, SqlitePool, Row};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::State;
+use chrono::Utc;
 
 pub async fn init_session_service() -> Result<SqliteSessionService, String> {
     let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -24,6 +27,25 @@ pub async fn init_session_service() -> Result<SqliteSessionService, String> {
         .await
         .map_err(|e| format!("{}", e))?;
     service.migrate().await.map_err(|e| format!("{}", e))?;
+
+    Ok(service)
+}
+
+pub async fn init_memory_service() -> Result<SqliteMemoryService, String> {
+    let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    path.push("cocktail-app");
+    std::fs::create_dir_all(&path).ok();
+    path.push("cocktail-memory.db");
+
+    let db_url = format!("sqlite:{}?mode=rwc", path.display());
+    println!("Initializing memory DB at: {}", db_url);
+
+    let service = SqliteMemoryService::new(&db_url)
+        .await
+        .map_err(|e| format!("{}", e))?;
+    
+    // 表已经手动创建，不需要 migrate
+    println!("✅ Memory service initialized (tables already exist)");
 
     Ok(service)
 }
@@ -45,8 +67,11 @@ pub struct ChatAgentResponse {
 #[tauri::command]
 pub async fn send_chat_message(
     message: String,
+    mood: Option<String>,
+    weather: Option<String>,
     pool: State<'_, Pool<Sqlite>>,
     session_service: State<'_, Arc<SqliteSessionService>>,
+    memory_service: State<'_, Arc<SqliteMemoryService>>,
 ) -> Result<ChatMessagePayload, String> {
     // 1. 获取用户信息与大模型配置
     let user_profile: UserProfile = sqlx::query_as(
@@ -117,9 +142,32 @@ pub async fn send_chat_message(
     
     let user_id = UserId::try_from("1").map_err(|e| format!("{}", e))?;
     let session_id = SessionId::try_from("default-chat").map_err(|e| format!("{}", e))?;
+    
+    // 确保 session 存在，如果不存在则创建（每个用户只有一个固定 session）
+    let session_exists = session_service.get(GetRequest {
+        app_name: "cocktail-app".to_string(),
+        user_id: user_id.to_string(),
+        session_id: session_id.to_string(),
+        num_recent_events: None,
+        after: None,
+    }).await.is_ok();
+    
+    if !session_exists {
+        println!("🔧 创建新的固定 session: default-chat");
+        let mut state = HashMap::new();
+        state.insert("initialized".to_string(), serde_json::json!(true));
+        
+        session_service.create(CreateRequest {
+            app_name: "cocktail-app".to_string(),
+            user_id: user_id.to_string(),
+            session_id: Some(session_id.to_string()),
+            state,
+        }).await.map_err(|e| format!("创建 session 失败: {}", e))?;
+    }
+    
     let content = Content::new("user").with_text(&message);
 
-    let mut stream = runner.run(user_id, session_id, content).await.map_err(|e| format!("{}", e))?;
+    let mut stream = runner.run(user_id, session_id.clone(), content).await.map_err(|e| format!("{}", e))?;
     
     let mut final_text = String::new();
     let mut event_id = String::new();
@@ -128,17 +176,24 @@ pub async fn send_chat_message(
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => {
-                if !event.llm_response.partial {
-                    if let Some(c) = event.content() {
-                        let text = c.parts.iter().filter_map(|p| p.text()).collect::<Vec<_>>().join("\n");
-                        final_text = text;
+                if let Some(c) = event.content() {
+                    let text = c.parts.iter().filter_map(|p| p.text()).collect::<Vec<_>>().join("");
+                    if !text.is_empty() {
+                        println!("收到文本片段: {}", text);
+                        final_text.push_str(&text);
                     }
-                    event_id = event.id.clone();
                 }
+                event_id = event.id.clone();
             }
-            Err(e) => return Err(format!("{}", e)),
+            Err(e) => {
+                eprintln!("❌ 流式输出错误: {}", e);
+                return Err(format!("AI生成失败: {}", e));
+            }
         }
     }
+    
+    println!("=== LLM返回完整内容 ===");
+    println!("{}", final_text);
 
     // 5. 解析 JSON 响应
     let clean_json = final_text.trim().trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
@@ -151,11 +206,41 @@ pub async fn send_chat_message(
 
     // 6. 获取推荐的完整酒款信息
     let mut recipes = Vec::new();
-    for r_id in ai_response.recommended_recipe_ids {
-        if let Ok(Some(recipe_detail)) = crate::commands::get_recipe_by_id(r_id, pool.clone()).await {
+    for r_id in &ai_response.recommended_recipe_ids {
+        if let Ok(Some(recipe_detail)) = crate::commands::get_recipe_by_id(r_id.clone(), pool.clone()).await {
             recipes.push(recipe_detail.recipe);
         }
     }
+
+    // 7. 保存对话到 memory
+    let mut context_message = message.clone();
+    if mood.is_some() || weather.is_some() {
+        context_message = format!("【心情:{} 天气:{}】{}", 
+            mood.as_deref().unwrap_or(""), 
+            weather.as_deref().unwrap_or(""), 
+            message);
+    }
+    
+    let user_entry = MemoryEntry {
+        content: Content::new("user").with_text(&context_message),
+        author: "user".to_string(),
+        timestamp: Utc::now(),
+    };
+    
+    let assistant_entry = MemoryEntry {
+        content: Content::new("assistant").with_text(&final_text),
+        author: "assistant".to_string(),
+        timestamp: Utc::now(),
+    };
+    
+    memory_service.add_session(
+        "cocktail-app",
+        "1",
+        &event_id,
+        vec![user_entry, assistant_entry]
+    ).await.map_err(|e| format!("保存对话记录失败: {}", e))?;
+    
+    println!("✅ 对话已保存到 memory");
 
     Ok(ChatMessagePayload {
         id: event_id,
@@ -168,37 +253,73 @@ pub async fn send_chat_message(
 #[tauri::command]
 pub async fn get_chat_history(
     pool: State<'_, Pool<Sqlite>>,
-    session_service: State<'_, Arc<SqliteSessionService>>,
+    memory_service: State<'_, Arc<SqliteMemoryService>>,
 ) -> Result<Vec<ChatMessagePayload>, String> {
-    let session = session_service.get(GetRequest {
-        app_name: "cocktail-app".to_string(),
-        user_id: "1".to_string(),
-        session_id: "default-chat".to_string(),
-        num_recent_events: None,
-        after: None,
-    }).await;
-
-    let session = match session {
-        Ok(s) => s,
-        Err(_) => return Ok(vec![]), // 无历史记录
-    };
-
-    let events = session.events().all();
+    println!("=== 加载历史记录 ===");
+    
+    // 直接从数据库查询所有对话记录（按时间排序）
+    // 不使用 FTS5 search，因为空查询不会返回结果
+    let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    path.push("cocktail-app");
+    path.push("cocktail-memory.db");
+    
+    let db_url = format!("sqlite:{}?mode=rwc", path.display());
+    let memory_pool = SqlitePool::connect(&db_url)
+        .await
+        .map_err(|e| format!("连接 memory 数据库失败: {}", e))?;
+    
+    let rows = sqlx::query(
+        "SELECT content, author, timestamp FROM memory_entries 
+         WHERE app_name = ? AND user_id = ? 
+         ORDER BY timestamp ASC"
+    )
+    .bind("cocktail-app")
+    .bind("1")
+    .fetch_all(&memory_pool)
+    .await
+    .map_err(|e| format!("查询历史记录失败: {}", e))?;
+    
+    println!("找到 {} 条 memory entries", rows.len());
+    
     let mut history = Vec::new();
-
-    for ev in events {
-        let role = if ev.author == "user" { "user" } else { "assistant" };
-        let mut text = String::new();
-        if let Some(c) = ev.content() {
-            text = c.parts.iter().filter_map(|p| p.text()).collect::<Vec<_>>().join("\n");
-        }
-
-        let mut reply_text = text.clone();
-        let mut recipes = Vec::new();
-
-        // 尝试解析 JSON 寻找推荐酒款
-        if role == "assistant" {
-            let clean_json = text.trim().trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
+    let mut current_user_msg: Option<ChatMessagePayload> = None;
+    
+    // 遍历所有 memory entries
+    for row in rows {
+        let content_str: String = row.try_get("content").map_err(|e| format!("获取 content 失败: {}", e))?;
+        let author: String = row.try_get("author").map_err(|e| format!("获取 author 失败: {}", e))?;
+        let timestamp_str: String = row.try_get("timestamp").map_err(|e| format!("获取 timestamp 失败: {}", e))?;
+        
+        // 解析 content JSON
+        let content: Content = serde_json::from_str(&content_str)
+            .unwrap_or_else(|_| Content::new("user"));
+        
+        let text = content.parts.iter()
+            .filter_map(|p| p.text())
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        println!("处理 {} 消息: {} 字符", author, text.len());
+        
+        if author == "user" {
+            // 保存用户消息，等待配对的 assistant 消息
+            current_user_msg = Some(ChatMessagePayload {
+                id: timestamp_str.clone(),
+                role: "user".to_string(),
+                text,
+                recipes: vec![],
+            });
+        } else if author == "assistant" {
+            // assistant 消息，尝试解析并获取推荐酒款
+            let clean_json = text.trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+            
+            let mut reply_text = text.clone();
+            let mut recipes = Vec::new();
+            
             if let Ok(ai_response) = serde_json::from_str::<ChatAgentResponse>(clean_json) {
                 reply_text = ai_response.reply;
                 for r_id in ai_response.recommended_recipe_ids {
@@ -207,27 +328,33 @@ pub async fn get_chat_history(
                     }
                 }
             }
+            
+            // 先添加用户消息（如果有）
+            if let Some(user_msg) = current_user_msg.take() {
+                history.push(user_msg);
+            }
+            
+            // 然后添加 assistant 消息
+            history.push(ChatMessagePayload {
+                id: timestamp_str,
+                role: "assistant".to_string(),
+                text: reply_text,
+                recipes,
+            });
         }
-
-        history.push(ChatMessagePayload {
-            id: ev.id,
-            role: role.to_string(),
-            text: reply_text,
-            recipes,
-        });
     }
-
+    
+    println!("✅ 加载了 {} 条历史消息", history.len());
     Ok(history)
 }
 
 #[tauri::command]
 pub async fn clear_chat_history(
-    session_service: State<'_, Arc<SqliteSessionService>>,
+    memory_service: State<'_, Arc<SqliteMemoryService>>,
 ) -> Result<(), String> {
-    let _ = session_service.delete(DeleteRequest {
-        app_name: "cocktail-app".to_string(),
-        user_id: "1".to_string(),
-        session_id: "default-chat".to_string(),
-    }).await;
+    // 删除所有用户的对话记录
+    memory_service.delete_user("cocktail-app", "1")
+        .await
+        .map_err(|e| format!("清空历史记录失败: {}", e))?;
     Ok(())
 }

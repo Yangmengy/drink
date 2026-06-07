@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS user_profile (
     bio TEXT,
     mbti TEXT,
     zodiac TEXT,
+    current_mood TEXT,
+    current_weather TEXT,
     llm_api_key TEXT,
     llm_model TEXT,
     llm_base_url TEXT,

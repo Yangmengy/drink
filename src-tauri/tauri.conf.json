@@ -18,6 +18,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "android": {
+      "minSdkVersion": 26,
+      "versionCode": 1
+    },
+    "iOS": {
+      "minimumSystemVersion": "15.0"
+    },
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
