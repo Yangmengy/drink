@@ -15,13 +15,22 @@ use tauri::State;
 use chrono::Utc;
 
 pub async fn init_session_service() -> Result<SqliteSessionService, String> {
-    let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    // 使用与主数据库相同的路径逻辑（Android 兼容）
+    let base_path = if cfg!(target_os = "android") {
+        std::env::var("HOME")
+            .or_else(|_| std::env::var("TMPDIR"))
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/data/local/tmp"))
+    } else {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
+    };
+    
+    let mut path = base_path;
     path.push("cocktail-app");
     std::fs::create_dir_all(&path).ok();
     path.push("cocktail-chat.db");
 
     let db_url = format!("sqlite:{}?mode=rwc", path.display());
-    println!("Initializing chat session DB at: {}", db_url);
 
     let service = SqliteSessionService::new(&db_url)
         .await
@@ -32,20 +41,26 @@ pub async fn init_session_service() -> Result<SqliteSessionService, String> {
 }
 
 pub async fn init_memory_service() -> Result<SqliteMemoryService, String> {
-    let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    // 使用与主数据库相同的路径逻辑（Android 兼容）
+    let base_path = if cfg!(target_os = "android") {
+        std::env::var("HOME")
+            .or_else(|_| std::env::var("TMPDIR"))
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/data/local/tmp"))
+    } else {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
+    };
+    
+    let mut path = base_path;
     path.push("cocktail-app");
     std::fs::create_dir_all(&path).ok();
     path.push("cocktail-memory.db");
 
     let db_url = format!("sqlite:{}?mode=rwc", path.display());
-    println!("Initializing memory DB at: {}", db_url);
 
     let service = SqliteMemoryService::new(&db_url)
         .await
         .map_err(|e| format!("{}", e))?;
-    
-    // 表已经手动创建，不需要 migrate
-    println!("✅ Memory service initialized (tables already exist)");
 
     Ok(service)
 }
@@ -153,7 +168,6 @@ pub async fn send_chat_message(
     }).await.is_ok();
     
     if !session_exists {
-        println!("🔧 创建新的固定 session: default-chat");
         let mut state = HashMap::new();
         state.insert("initialized".to_string(), serde_json::json!(true));
         
@@ -172,28 +186,22 @@ pub async fn send_chat_message(
     let mut final_text = String::new();
     let mut event_id = String::new();
 
-    // 收集流式输出
     while let Some(result) = stream.next().await {
         match result {
             Ok(event) => {
                 if let Some(c) = event.content() {
                     let text = c.parts.iter().filter_map(|p| p.text()).collect::<Vec<_>>().join("");
                     if !text.is_empty() {
-                        println!("收到文本片段: {}", text);
                         final_text.push_str(&text);
                     }
                 }
                 event_id = event.id.clone();
             }
             Err(e) => {
-                eprintln!("❌ 流式输出错误: {}", e);
                 return Err(format!("AI生成失败: {}", e));
             }
         }
     }
-    
-    println!("=== LLM返回完整内容 ===");
-    println!("{}", final_text);
 
     // 5. 解析 JSON 响应
     let clean_json = final_text.trim().trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
@@ -239,8 +247,6 @@ pub async fn send_chat_message(
         &event_id,
         vec![user_entry, assistant_entry]
     ).await.map_err(|e| format!("保存对话记录失败: {}", e))?;
-    
-    println!("✅ 对话已保存到 memory");
 
     Ok(ChatMessagePayload {
         id: event_id,
@@ -255,11 +261,16 @@ pub async fn get_chat_history(
     pool: State<'_, Pool<Sqlite>>,
     memory_service: State<'_, Arc<SqliteMemoryService>>,
 ) -> Result<Vec<ChatMessagePayload>, String> {
-    println!("=== 加载历史记录 ===");
+    let base_path = if cfg!(target_os = "android") {
+        std::env::var("HOME")
+            .or_else(|_| std::env::var("TMPDIR"))
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("/data/local/tmp"))
+    } else {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
+    };
     
-    // 直接从数据库查询所有对话记录（按时间排序）
-    // 不使用 FTS5 search，因为空查询不会返回结果
-    let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    let mut path = base_path;
     path.push("cocktail-app");
     path.push("cocktail-memory.db");
     
@@ -279,8 +290,6 @@ pub async fn get_chat_history(
     .await
     .map_err(|e| format!("查询历史记录失败: {}", e))?;
     
-    println!("找到 {} 条 memory entries", rows.len());
-    
     let mut history = Vec::new();
     let mut current_user_msg: Option<ChatMessagePayload> = None;
     
@@ -298,8 +307,6 @@ pub async fn get_chat_history(
             .filter_map(|p| p.text())
             .collect::<Vec<_>>()
             .join("\n");
-        
-        println!("处理 {} 消息: {} 字符", author, text.len());
         
         if author == "user" {
             // 保存用户消息，等待配对的 assistant 消息
@@ -344,7 +351,6 @@ pub async fn get_chat_history(
         }
     }
     
-    println!("✅ 加载了 {} 条历史消息", history.len());
     Ok(history)
 }
 
