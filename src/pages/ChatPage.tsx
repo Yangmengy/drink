@@ -1,0 +1,118 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ArrowDown, ArrowUp, MessageCircle, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useChat } from '../components/ChatContext';
+import { RecipeCard } from '../components/RecipeCard';
+
+const suggestions = ['今天想随便聊聊', '用我现有的材料，做一杯不太甜的酒', '有点累，陪我待一会儿'];
+
+export function ChatPage() {
+  const { messages, pending, loading, error, send, clear } = useChat();
+  const [draft, setDraft] = useState('');
+  const [atBottom, setAtBottom] = useState(true);
+  const bottom = useRef<HTMLDivElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const didInitScroll = useRef(false);
+
+  const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => bottom.current?.scrollIntoView({ behavior, block: 'end' });
+
+  // 观察底部锚点，判断用户是否正在阅读最新消息
+  // rootMargin 底部收缩：锚点需露出停靠条之上才算"在底部"；阈值必须小于锚点以下的内容高度
+  useEffect(() => {
+    const el = bottom.current;
+    if (!el) return;
+    const shrink = window.matchMedia('(max-width: 720px)').matches ? -175 : -100;
+    const io = new IntersectionObserver(([entry]) => setAtBottom(entry.isIntersecting), { rootMargin: `0px 0px ${shrink}px 0px` });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // 历史加载完成后直接定位到最新一条
+  useEffect(() => {
+    if (!loading && !didInitScroll.current) {
+      didInitScroll.current = true;
+      scrollToLatest('auto');
+    }
+  }, [loading]);
+
+  // 自己发送消息时总是滚到底；收到回复时，只有停留在底部才跟随，上翻阅读时不打断
+  useEffect(() => { if (pending) scrollToLatest(); }, [pending]);
+  useEffect(() => { if (atBottom) scrollToLatest(); }, [messages, error, atBottom]);
+
+  // 输入框随内容自动增高（上限由 CSS max-height 控制）
+  useEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const capped = Math.min(el.scrollHeight, 160);
+    el.style.height = `${capped}px`;
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden';
+  }, [draft]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text || pending) return;
+    if (await send(text)) setDraft('');
+    textarea.current?.focus();
+  }
+
+  return (
+    <section className="chat-page">
+      <header className="page-header">
+        <span className="eyebrow">A LITTLE COMPANY</span>
+        <button className="icon-button" aria-label="清空对话" title="清空对话和上下文" disabled={!!pending || !messages.length} onClick={() => { if (window.confirm('清空这段对话？聊天记录和 Agent 上下文都会被清除。')) void clear(); }}>
+          <Trash2 size={19} />
+        </button>
+      </header>
+      <div className="conversation" role="log" aria-label="聊天记录" aria-live="polite">
+        {!messages.length && !pending && (
+          <div className="welcome">
+            <div className="welcome-icon"><MessageCircle size={28} strokeWidth={1.4} /></div>
+            <h2>今天过得怎么样？</h2>
+            <p>想聊什么都可以。想喝一杯时，<br />我们再一起看看酒柜里有什么。</p>
+            <div className="suggestions">
+              {suggestions.map(s => <button key={s} onClick={() => { setDraft(s); textarea.current?.focus(); }}>{s}</button>)}
+            </div>
+          </div>
+        )}
+        {messages.map(message => (
+          <article className={`message ${message.role}`} key={message.id}>
+            <span className="message-author">{message.role === 'user' ? '我' : 'Mixology'}</span>
+            <p>{message.text}</p>
+            {message.recipes.length > 0 && <div className="recommendations">{message.recipes.map(r => <RecipeCard key={r.id} recipe={r} />)}</div>}
+            {message.traceId && <Link className="trace-link" to={`/settings?trace=${message.traceId}`}>查看本轮链路</Link>}
+          </article>
+        ))}
+        {pending && (
+          <>
+            <article className="message user"><span className="message-author">我</span><p>{pending}</p></article>
+            <article className="message assistant">
+              <span className="message-author">Mixology</span>
+              <p className="muted" role="status"><span className="typing" aria-hidden="true"><i /><i /><i /></span>正在听你说，也在想怎么回答…</p>
+            </article>
+          </>
+        )}
+        {loading && <p role="status" className="muted">正在找回上次的对话…</p>}
+        {error && <div className="error" role="alert">{error}<Link to="/settings">检查设置</Link></div>}
+        <div className="bottom-anchor" ref={bottom} />
+      </div>
+      {!atBottom && messages.length > 0 && (
+        <button className="to-latest" onClick={() => scrollToLatest()}>回到最新<ArrowDown size={14} /></button>
+      )}
+      <div className="composer-dock">
+        <form className="composer" onSubmit={submit}>
+          <label className="sr-only" htmlFor="message">说点什么</label>
+          <textarea
+            id="message" ref={textarea} value={draft} maxLength={4000} rows={2}
+            placeholder="说点什么，或者一起挑一杯酒…"
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+          />
+          <button className="send-button" type="submit" disabled={!draft.trim() || !!pending || loading} aria-label="发送消息"><ArrowUp size={22} /></button>
+        </form>
+        <p className="composer-note">陪你聊聊，也陪你慢慢挑。配方来自你的酒单。</p>
+      </div>
+    </section>
+  );
+}

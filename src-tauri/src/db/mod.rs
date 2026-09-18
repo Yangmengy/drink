@@ -1,124 +1,156 @@
-use sqlx::{sqlite::SqlitePool, Row};
-use std::path::PathBuf;
-use anyhow::Result;
-use tauri::Manager;  // 需要这个 trait 来使用 path() 方法
+use anyhow::{ensure, Context, Result};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    Row, SqliteConnection, SqlitePool,
+};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
-/// 从 Tauri 资源加载 seed.sql
-/// Android: 从 APK 资源读取，桌面: 从文件系统读取
-fn load_seed_sql(app_handle: Option<&tauri::AppHandle>) -> Result<String> {
-    #[cfg(target_os = "android")]
-    {
-        if let Some(handle) = app_handle {
-            let resolver = handle.path();
-            
-            // 尝试从 APK assets 读取 seed.sql
-            if let Ok(resource_dir) = resolver.resource_dir() {
-                let seed_path = resource_dir.as_path().join("seed.sql");
-                
-                if let Ok(content) = std::fs::read_to_string(&seed_path) {
-                    return Ok(content);
-                }
-            }
-        }
-        
-        // Fallback: 如果 assets 读取失败，返回空 SQL（应用启动时会是空数据库）
-        // 这样可以避免将大量数据编译进 .so 文件
-        Ok(String::new())
-    }
-    
-    #[cfg(not(target_os = "android"))]
-    {
-        // 桌面版：继续使用编译时嵌入
-        Ok(include_str!("../../data/seed.sql").to_string())
-    }
-}
+mod legacy;
 
-/// 初始化 Android assets
-/// 这个函数在有 AppHandle 之前被调用，只做基础检查
-pub fn init_android_assets() -> Result<()> {
-    #[cfg(target_os = "android")]
-    {
-        let cache_dir = std::env::var("HOME")
-            .or_else(|_| std::env::var("TMPDIR"))
-            .unwrap_or_else(|_| "/data/local/tmp".to_string());
-        
-        let cocktail_dir = format!("{}/cocktail-app", cache_dir);
-        std::fs::create_dir_all(&cocktail_dir)?;
-    }
-    
-    Ok(())
-}
+pub const SCHEMA_VERSION: i64 = 2;
 
-/// 获取数据库文件路径
-fn get_db_path() -> Result<PathBuf> {
-    let base_path = if cfg!(target_os = "android") {
-        std::env::var("HOME")
-            .or_else(|_| std::env::var("TMPDIR"))
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/data/local/tmp"))
-    } else {
-        dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
-    };
-    
-    let mut path = base_path;
-    path.push("cocktail-app");
-    
-    std::fs::create_dir_all(&path)
-        .map_err(|e| anyhow::anyhow!("Failed to create data directory: {}", e))?;
-    
-    path.push("cocktail.db");
-    
+/// The personal desktop app keeps the original data directory.
+pub fn data_directory() -> Result<PathBuf> {
+    let path = dirs::data_dir()
+        .context("无法定位本地数据目录")?
+        .join("cocktail-app");
+    #[cfg(debug_assertions)]
+    let path = std::env::var_os("MIXOLOGY_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or(path);
+    std::fs::create_dir_all(&path)?;
     Ok(path)
 }
 
-/// 初始化数据库连接池
-pub async fn init_database(app_handle: Option<&tauri::AppHandle>) -> Result<SqlitePool> {
-    let db_path = get_db_path()?;
-    let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
-    
-    let pool = SqlitePool::connect(&db_url).await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))?;
-    
-    let schema = include_str!("../../data/schema.sql");
-    sqlx::query(schema).execute(&pool).await
-        .map_err(|e| anyhow::anyhow!("Failed to create schema: {}", e))?;
-    
-    let _ = sqlx::query("ALTER TABLE drink_logs ADD COLUMN images TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN bio TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN mbti TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN zodiac TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_api_key TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_model TEXT").execute(&pool).await;
-    let _ = sqlx::query("ALTER TABLE user_profile ADD COLUMN llm_base_url TEXT").execute(&pool).await;
-    
-    let count: i64 = sqlx::query("SELECT COUNT(*) as count FROM recipes")
-        .fetch_one(&pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to query recipes: {}", e))?
-        .get("count");
-    
-    if count == 0 {
-        let seed = load_seed_sql(app_handle)?;
-        
-        sqlx::query(&seed).execute(&pool).await
-            .map_err(|e| anyhow::anyhow!("Failed to seed data: {}", e))?;
-    }
-    
+pub async fn open(path: &Path) -> Result<SqlitePool> {
+    let options = SqliteConnectOptions::new()
+        .filename(path)
+        .create_if_missing(true)
+        .foreign_keys(true)
+        .busy_timeout(Duration::from_secs(5));
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(options)
+        .await?;
+    initialize(&pool).await?;
     Ok(pool)
 }
 
-/// 执行数据库迁移（未来扩展用）
-pub async fn migrate_database(_pool: &SqlitePool) -> Result<()> {
-    // 预留给未来的数据库迁移逻辑
-    Ok(())
+// These are the columns the application reads/writes, not the entire historical schema.
+// Extra columns and tables are deliberately accepted and preserved.
+const REQUIRED_COLUMNS: &[(&str, &str)] = &[
+    ("recipes", "id name_zh name_en category description method flavor_profile image_url source created_at updated_at"),
+    ("ingredients", "id name_zh category created_at updated_at"),
+    ("recipe_ingredients", "id recipe_id ingredient_id amount unit is_optional display_order created_at"),
+    ("recipe_steps", "id recipe_id step_number instruction created_at"),
+    ("user_inventory", "id ingredient_id added_at updated_at"),
+    ("core_migrations", "version applied_at"),
+    ("companion_settings", "id name preferences model base_url"),
+    ("agent_traces", "id started_at duration_ms status events error"),
+    ("user_profile", "id"),
+];
+
+async fn inspect(connection: &mut SqliteConnection) -> Result<i64> {
+    let tables: HashSet<String> = sqlx::query_scalar(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    )
+    .fetch_all(&mut *connection)
+    .await?
+    .into_iter()
+    .collect();
+    if tables.is_empty() {
+        return Ok(0);
+    }
+    for (table, required) in REQUIRED_COLUMNS {
+        if !tables.contains(*table) {
+            continue;
+        }
+        let columns: HashSet<String> = sqlx::query(&format!("PRAGMA table_info({table})"))
+            .fetch_all(&mut *connection)
+            .await?
+            .iter()
+            .map(|r| r.get("name"))
+            .collect();
+        let missing: Vec<_> = required
+            .split_ascii_whitespace()
+            .filter(|c| !columns.contains(*c))
+            .collect();
+        ensure!(
+            missing.is_empty(),
+            "数据库结构不兼容：{table} 缺少字段 {}；未执行迁移，请先备份并使用匹配的版本",
+            missing.join(", ")
+        );
+    }
+    let versions: Vec<i64> = if tables.contains("core_migrations") {
+        sqlx::query_scalar("SELECT version FROM core_migrations ORDER BY version")
+            .fetch_all(&mut *connection)
+            .await?
+    } else {
+        vec![]
+    };
+    let version = versions.last().copied().unwrap_or(0);
+    ensure!(
+        version <= SCHEMA_VERSION,
+        "数据库版本 {version} 高于本程序支持的 {SCHEMA_VERSION}；请使用更新版本，未执行迁移"
+    );
+    ensure!(
+        versions == (1..=version).collect::<Vec<_>>(),
+        "数据库迁移记录不连续，未执行迁移；请先备份并检查原数据库"
+    );
+    let required_tables = if version == 0 { 5 } else { 8 };
+    for (table, _) in &REQUIRED_COLUMNS[..required_tables] {
+        ensure!(
+            tables.contains(*table),
+            "数据库结构不兼容：缺少表 {table}；未执行迁移，请确认所选文件属于本应用"
+        );
+    }
+    if version > 0 {
+        let has_settings: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM companion_settings WHERE id=1)")
+                .fetch_one(&mut *connection)
+                .await?;
+        ensure!(
+            has_settings,
+            "本地配置记录缺失，未执行迁移；请先备份并检查原数据库"
+        );
+    }
+    Ok(version)
 }
 
-/// 数据库健康检查
-pub async fn health_check(pool: &SqlitePool) -> Result<bool> {
-    let result: i64 = sqlx::query("SELECT 1")
-        .fetch_one(pool)
-        .await?
-        .get(0);
-    
-    Ok(result == 1)
+pub async fn initialize(pool: &SqlitePool) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    // Reject unsupported/partial databases before creating tables or seeding any records.
+    let version = inspect(&mut tx).await?;
+    sqlx::raw_sql(include_str!("../../data/schema.sql"))
+        .execute(&mut *tx)
+        .await?;
+    if version == 0 {
+        sqlx::raw_sql(include_str!("../../data/seed.sql"))
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT OR IGNORE INTO companion_settings (id) VALUES (1)")
+            .execute(&mut *tx)
+            .await?;
+        legacy::import_profile(&mut tx).await?;
+        sqlx::query("INSERT INTO core_migrations VALUES (1, strftime('%s','now'))")
+            .execute(&mut *tx)
+            .await?;
+    }
+    if version < 2 {
+        // The unused legacy FTS data remains a historical snapshot; stop maintaining it.
+        sqlx::raw_sql(
+            "DROP TRIGGER IF EXISTS recipes_fts_insert;
+             DROP TRIGGER IF EXISTS recipes_fts_update;
+             DROP TRIGGER IF EXISTS recipes_fts_delete;
+             INSERT INTO core_migrations VALUES (2, strftime('%s','now'));",
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }

@@ -1,7 +1,7 @@
 {
   "name": "cocktail-app",
-  "version": "1.0.0",
-  "description": "极简风格 iOS 鸡尾酒调酒助手",
+  "version": "0.2.0",
+  "description": "本地优先的陪伴式调酒 Agent",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,22 +9,19 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "test": "playwright test",
+    "test:core": "cargo test --manifest-path src-tauri/Cargo.toml --tests"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.56.2",
-    "@tanstack/react-virtual": "^3.10.8",
     "@tauri-apps/api": "^2.11.0",
-    "date-fns": "^4.4.0",
-    "framer-motion": "^11.5.4",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
-    "react-calendar": "^6.0.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.0.2",
-    "zustand": "^5.0.0"
+    "react-router-dom": "^7.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",

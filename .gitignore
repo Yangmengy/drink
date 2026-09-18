@@ -24,11 +24,20 @@ dist-ssr
 *.sw?
 
 # Tauri
-src-tauri/target
+/src-tauri/target/
+/src-tauri/gen/
 
-# Documentation files (除了 README.md)
-*.md
-!README.md
 
 # Workbuddy memory
 .workbuddy/
+
+# Local data and credentials
+*.keystore
+*.db
+*.db-*
+.env
+.env.*
+!.env.example
+.model-key*
+test-results/
+playwright-report/

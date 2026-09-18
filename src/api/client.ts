@@ -1,77 +1,21 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { DBRecipe, DBRecipeDetail, RecipeFilter, InventoryItem } from "../types";
-
-let isTauri = false;
-try {
-  isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-} catch {
-  isTauri = false;
+import { invoke } from '@tauri-apps/api/core';
+import type { Ingredient, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace } from '../types';
+export const isNative = () => '__TAURI_INTERNALS__' in window;
+async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isNative()) throw new Error('当前为界面预览。请运行 npm run tauri:dev，使用本地酒柜和 Agent。');
+  return invoke<T>(command, args);
 }
-
-export async function apiInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (isTauri) {
-    return invoke<T>(cmd, args);
-  }
-  throw new Error(`Not in Tauri environment, cannot invoke: ${cmd}`);
-}
-
-export const recipeApi = {
-  list: (filter?: RecipeFilter) =>
-    apiInvoke<DBRecipe[]>("get_recipes", { filter }),
-  getById: (id: string) =>
-    apiInvoke<DBRecipeDetail | null>("get_recipe_by_id", { id }),
-  search: (query: string) =>
-    apiInvoke<DBRecipe[]>("search_recipes", { query }),
-  createCustom: (nameZh: string, category: string, imageUrl: string | null, details?: import("../types").CustomRecipeDetails) =>
-    apiInvoke<string>("create_custom_recipe", { nameZh, category, imageUrl, details }),
-  updateImage: (recipeId: string, imageUrl: string) =>
-    apiInvoke<void>("update_recipe_image", { recipeId, imageUrl }),
-  delete: (recipeId: string) =>
-    apiInvoke<void>("delete_recipe", { recipeId }),
-  getFavorites: () =>
-    apiInvoke<DBRecipe[]>("get_favorite_recipes"),
-  getHistory: (limit?: number) =>
-    apiInvoke<DBRecipe[]>("get_recipe_history", { limit }),
-  toggleFavorite: (recipeId: string) =>
-    apiInvoke<boolean>("toggle_favorite", { recipeId }),
+export const api = {
+  ingredients: () => call<Ingredient[]>('list_ingredients'),
+  setOwned: (id: string, owned: boolean) => call<void>('set_ingredient_owned', { id, owned }),
+  menu: (query = '') => call<Recipe[]>('search_menu', { query: { query } }),
+  saveRecipe: (input: RecipeInput) => call<string>('save_custom_recipe', { input }),
+  deleteRecipe: (id: string) => call<void>('delete_custom_recipe', { id }),
+  settings: () => call<Settings>('get_settings'),
+  saveSettings: (input: SettingsInput) => call<Settings>('save_settings', { input }),
+  history: () => call<ChatMessage[]>('get_chat_history'),
+  send: (message: string) => call<ChatMessage>('send_chat_message', { message }),
+  clear: () => call<void>('clear_chat_history'),
+  traces: () => call<AgentTrace[]>('list_agent_traces'),
 };
-
-export const inventoryApi = {
-  list: () =>
-    apiInvoke<InventoryItem[]>("get_inventory"),
-  getAllIngredients: () =>
-    apiInvoke<import("../types").Ingredient[]>("get_all_ingredients"),
-  add: (ingredientId: string) =>
-    apiInvoke<void>("add_to_inventory", { ingredientId }),
-  remove: (ingredientId: string) =>
-    apiInvoke<void>("remove_from_inventory", { ingredientId }),
-  addCustomIngredient: (nameZh: string) =>
-    apiInvoke<string>("create_custom_ingredient", { nameZh }),
-  getRecipesByInventory: () =>
-    apiInvoke<DBRecipe[]>("get_recipes_by_inventory"),
-};
-
-export const todoApi = {
-  list: () => apiInvoke<import("../types").TodoItem[]>("get_todos"),
-  add: (recipeId: string) => apiInvoke<boolean>("add_todo", { recipeId }),
-  remove: (recipeId: string) => apiInvoke<boolean>("remove_todo", { recipeId }),
-  isTodo: (recipeId: string) => apiInvoke<boolean>("is_todo", { recipeId }),
-};
-
-export const logApi = {
-  list: (dateStr?: string) => apiInvoke<import("../types").DrinkLog[]>("get_drink_logs", { dateStr }),
-  add: (recipeId: string, dateStr: string, rating: number | null, notes: string | null, images: string[] | null) => 
-    apiInvoke<boolean>("add_drink_log", { recipeId, dateStr, rating, notes, images }),
-  delete: (logId: string) => apiInvoke<boolean>("delete_drink_log", { logId }),
-};
-
-export const imageApi = {
-  upload: (base64Data: string) => apiInvoke<string>("upload_image", { base64Data }),
-};
-
-export const userApi = {
-  getProfile: () => apiInvoke<import("../types").UserProfile>("get_user_profile"),
-  updateProfile: (args: import("../types").UpdateProfileArgs) => 
-    apiInvoke<import("../types").UserProfile>("update_user_profile", { args }),
-  getStats: () => apiInvoke<import("../types").UserStats>("get_user_stats"),
-};
+export const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);

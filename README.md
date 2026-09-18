@@ -1,267 +1,101 @@
-# 🍸 调酒 App - Cocktail App
+# Mixology · 陪伴式调酒 Agent
 
-> 极简风格 iOS 鸡尾酒调酒助手 | Tauri v2 + React 18 + Rust
+个人本地使用的桌面聊天伙伴，当前以 macOS 为验证目标。想聊时陪你聊，需要酒品建议时才通过工具读取酒柜与菜单。推荐同时覆盖内置酒品和你的自创配方，不需要部署云服务器。
 
-一款帮助调酒爱好者学习、管理和创作鸡尾酒的移动应用，采用 iOS 风格极简设计，支持 Android、iOS 和桌面平台。
+## 四个入口
 
----
+- **聊天**：自然陪伴、按需推荐、配方详情；每轮回复可查看调用链路。
+- **酒柜**：维护已有原料，浏览内置与自创酒单。库存记录材料种类，暂不计算剩余用量。
+- **自定义**：创建、编辑和删除自己的配方；保存后立即可被 Agent 工具召回。
+- **设置**：昵称、口味偏好、模型配置，以及最近 100 轮本地 trace。
 
-## 📋 项目概览
+## 核心工作流
 
-### 核心功能
-- 🔍 **智能搜索** - FTS5 全文搜索，毫秒级响应
-- 🍹 **配方浏览** - 内置 277+ 经典配方（IBA 官方 + 流行配方）
-- 🧊 **我的酒柜** - 管理库存，智能推荐可调制的鸡尾酒
-- 📝 **制作指引** - 分步骤指导 + 计时器
-- ♥️ **收藏管理** - 保存喜欢的配方
-- 🎨 **深色模式** - 完整支持浅色/深色主题
-- 📱 **离线优先** - 所有数据本地存储，完全离线可用
-
-### 技术亮点
-- ⚡ **极致性能** - Rust 后端 + SQLite，搜索 <50ms
-- 🎭 **毛玻璃设计** - iOS 风格半透明效果
-- 🔄 **前后端分离** - TypeScript + Rust，类型安全
-- 📦 **轻量体积** - <10MB 安装包
-- 🚀 **跨平台** - 一套代码，多端运行
-
----
-
-## 📚 文档导航
-
-### 产品文档
-- **[PRD-CocktailApp.md](./PRD-CocktailApp.md)** — 产品需求文档 & 技术选型分析
-  - 技术选型深度分析
-  - 系统架构设计
-  - 功能需求矩阵
-  - 数据库设计
-  - 前后端分离规范
-  - 开发路线图
-
-### 设计文档 🎨
-- **[README-DESIGN.md](./README-DESIGN.md)** — 设计文档导航（从这里开始）
-- **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** — 设计系统规范 ⭐
-- **[DESIGN-MOCKUPS.md](./DESIGN-MOCKUPS.md)** — 视觉效果图说明
-- **[DESIGN-IMPLEMENTATION.md](./DESIGN-IMPLEMENTATION.md)** — 实现指南 ⭐
-- **[DESIGN-ASSETS.md](./DESIGN-ASSETS.md)** — 资产清单
-- **[design-tokens.css](./design-tokens.css)** — CSS 变量文件
-
----
-
-## 🏗️ 技术栈
-
-### 前端
-- **React 18.3** - UI 框架
-- **TypeScript 5.x** - 类型安全
-- **Vite 6.x** - 构建工具
-- **React Router 7** - 路由管理
-- **TanStack Query** - 数据缓存
-- **Framer Motion** - 动画库
-- **Lucide React** - 图标库
-
-### 后端
-- **Rust 1.86+** - 核心语言
-- **Tauri v2** - 跨平台框架
-- **SQLite + FTS5** - 数据库 + 全文搜索
-- **SQLx** - SQL 驱动
-- **Serde** - 序列化
-
-### 目标平台
-- **Android** (minSdk 26, arm64)
-- **iOS** (iOS 15+, arm64)
-- **Desktop** (macOS, Windows, Linux)
-
----
-
-## 🚀 快速开始
-
-### 环境要求
-- **Node.js** >= 18.x
-- **Rust** >= 1.86
-- **Tauri CLI** 2.x
-- **Xcode** (iOS 开发)
-- **Android Studio** + NDK (Android 开发)
-
-### 安装依赖
-
-```bash
-# 克隆仓库
-git clone <repo-url>
-cd drink
-
-# 安装前端依赖
-npm install
-
-# 安装 Tauri CLI
-cargo install tauri-cli --version "^2.0.0"
+```mermaid
+flowchart TD
+  Message[用户消息与对话上下文] --> Companion[ADK 陪伴主 Agent]
+  Companion -->|日常聊天| Reply[自然回复]
+  Companion -->|需要酒品建议| Tool[search_menu / get_recipe]
+  Tool --> Menu[召回内置与自创菜单]
+  Tool --> Inventory[读取本地库存]
+  Menu --> Facts[Rust 计算能否制作与缺料]
+  Inventory --> Facts
+  Facts --> Choose[主 Agent 选择候选并解释]
+  Choose --> Validate[校验本轮工具返回的酒品 ID]
+  Validate --> Cards[回复与真实配方卡片]
 ```
 
-### 开发
+不设置独立意图分类 Agent。菜单工具内部并行读取菜单与库存，缺料由 Rust 计算；模型从检索候选中选择最多 3 款。没有材料也可以展示缺料建议，不自动假定库存齐全。用户随口提到原料不自动修改库存，长期偏好通过设置维护。
 
-```bash
-# 启动开发服务器
-npm run tauri dev
+SQLite 是结构化菜单知识库，自创配方与内置配方走同一查询入口。当前内置菜单为 **83 款酒、161 种原料**。MVP 不使用向量库，也不依赖云端业务后端。
 
-# 前端热重载 + Rust 后端
+## 开发
+
+需要 Node.js 20+、Rust stable，以及系统对应的 [Tauri 开发依赖](https://v2.tauri.app/start/prerequisites/)。
+
+```sh
+npm ci
+npm run tauri:dev
 ```
 
-### 构建
+若提示找不到 `cargo`，先执行 `source "$HOME/.cargo/env"`，并确保终端启动配置加载了该文件。
 
-```bash
-# 构建 Android
-npm run tauri android build
+只运行 `npm run dev` 是浏览器界面预览，不会伪装为已经接通本地 Agent。实际数据和工具调用需要 Tauri。
 
-# 构建 iOS (需 macOS)
-npm run tauri ios build
+在设置中填写支持工具调用的 OpenAI-compatible 模型、基础 API URL 和自己的 API Key，例如 `qwen-plus` 与 `https://dashscope.aliyuncs.com/compatible-mode/v1`。聊天内容、最近的会话和所需候选配方会发送给所选模型服务商。应用没有内置可用密钥。
 
-# 构建桌面版
-npm run tauri build
+```sh
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml
+npm run test:core
+npx playwright install chromium
+npm test
 ```
 
----
+Rust 集成测试通过模拟 LLM 和本地 HTTP/SSE 服务驱动真实 ADK 工具循环，覆盖自创酒入库与召回、可选材料、缺料、非法 ID 拦截、历史持久化、清空上下文及 trace；数据库测试覆盖新库、旧库升级、不兼容版本拒绝和迁移失败回滚。浏览器测试替换 IPC 传输，检查四入口和表单交互；它不替代真实模型质量评估。
 
-## 📂 项目结构
+## 本地数据
 
+继续使用原桌面目录：`<系统数据目录>/cocktail-app/`。macOS 通常是 `~/Library/Application Support/cocktail-app/`。
+
+| 文件 | 用途 |
+| --- | --- |
+| `cocktail.db` | 菜单、原料、库存、偏好、模型地址和 trace |
+| `cocktail-chat.db` | ADK 持久会话，作为聊天展示与上下文的统一来源 |
+| `.model-key` | 本地独立密钥文件，Unix 权限 0600；未作加密 |
+
+新库只创建核心字段；旧库保留自创酒、库存、历史表及附加字段。数据库版本为 2，兼容原始 33 列/扩展 40 列旧库和核心版本 1，拒绝缺少必要字段或来自更新版本的库。旧 `cocktail-memory.db` 不再写入。主题选择留在本机 WebView 的 localStorage。迁移规则、密钥转存及备份说明见 [本地数据边界](docs/local-data.md)。
+
+对话模型使用最近 20 轮已接受消息；完整记录留在本地。每轮先在临时 ADK session 执行，只有通过结果校验后才保存对话，失败可重试。清空聊天会删除实际 session；本地 trace 独立保留，最多 100 轮，不包含完整对话、密钥或完整模型请求。
+
+调试版可设置 `MIXOLOGY_DATA_DIR=/absolute/test-directory` 使用隔离目录，发布版忽略此变量。不要将真实用户数据用于自动测试。
+
+## Trace
+
+每轮有唯一 `traceId`，覆盖本地配置读取、上下文准备、每次模型调用、首响应时间、token 用量（服务商及 ADK 适配器返回时）、工具执行、候选数量、缺料计算、输出校验和会话写入。错误 trace 保留中断阶段；未配置密钥也会留下记录。不会存储模型原始错误体，以避免请求中的敏感字段泄露。Trace 写入失败只记本地日志，不把已保存的成功回复误报为失败。
+
+当前使用按阶段排列的本地事件记录，不需要部署观测服务器；不包含网络重试的独立 span。部分兼容服务的独立 usage 流片段未被当前 ADK 适配器透传，此时不显示 token 统计。
+
+## 代码结构
+
+```text
+src/                         四页面、配方卡片、统一 IPC 类型
+src-tauri/src/agent.rs        ADK 主 Agent、工具与会话
+src-tauri/src/menu.rs         菜单、自创配方事务、库存与缺料
+src-tauri/src/db/             本地数据库与版本化初始化
+src-tauri/src/db/legacy.rs    旧用户资料的一次性导入
+src-tauri/src/settings.rs     设置与本地密钥
+src-tauri/src/trace.rs        本地调用链路
+src-tauri/prompts/            陪伴 Agent 提示词
+src-tauri/data/               Schema 与带显式列名的菜单数据
+adk-rust/                    保留的 ADK 上游源码与许可证
+docs/local-data.md           数据库兼容、迁移和备份边界
 ```
-drink/
-├── src/                      # React 前端
-│   ├── main.tsx             # 入口
-│   ├── App.tsx              # 根组件
-│   ├── pages/               # 页面组件
-│   ├── components/          # UI 组件
-│   ├── hooks/               # 自定义 Hooks
-│   ├── stores/              # 状态管理 (Zustand)
-│   ├── types/               # TypeScript 类型
-│   ├── lib/                 # 工具函数
-│   ├── assets/              # 静态资源
-│   └── styles/              # 样式文件
-│       ├── design-tokens.css
-│       └── global.css
-│
-├── src-tauri/               # Tauri + Rust 后端
-│   ├── src/
-│   │   ├── main.rs         # 入口
-│   │   ├── commands/       # Tauri Commands
-│   │   ├── services/       # 业务逻辑
-│   │   ├── db/             # 数据库
-│   │   ├── models/         # 数据模型
-│   │   └── types/          # Rust 类型
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-│
-├── PRD-CocktailApp.md       # 产品需求文档
-├── README-DESIGN.md         # 设计文档导航
-├── DESIGN-*.md              # 设计系统文档
-├── design-tokens.css        # CSS 变量
-└── package.json
-```
 
----
+`src-tauri/data/seed.sql` 是唯一内置菜单来源，83 款酒使用 80 张图片，均保留。Tauri 生成目录 `src-tauri/gen/`、Rust 编译缓存、前端构建产物与测试截图不提交；生成的权限 schema 会在构建时重建。
 
-## 🎨 设计理念
+## 本机归档
 
-### 核心原则
-- **极简主义** - Less is More，去除一切不必要的装饰
-- **扁平化** - SF Symbols 风格图标，线条简洁
-- **毛玻璃** - 半透明背景 + 背景模糊，营造轻盈感
-- **iOS 原生感** - 遵循 Apple HIG，熟悉的交互体验
+微信小程序与旧签名文件位于 `../drink-archive-20260917/`。旧产品/设计文档、Android/iOS 工程（含重复菜单）、Workbuddy 记忆和精简前的内置数据位于 `../drink-archive-20260918/`。这些是本机恢复材料，不参与当前构建，也不随 Git 克隆。当前仓库不维护移动端工程。
 
-### 视觉风格
-- **主色调**：#FF9500 (琥珀金)
-- **字体**：SF Pro Display / PingFang SC
-- **圆角**：8px / 12px / 16px / 24px
-- **间距**：8pt Grid 系统
-
-详细设计规范请查看 [README-DESIGN.md](./README-DESIGN.md)
-
----
-
-## 🗺️ 开发路线图
-
-### Phase 1 — 脚手架 & 契约 (Week 1) ✅
-- [x] Tauri v2 项目初始化
-- [x] React + TypeScript 配置
-- [x] 设计系统完成
-- [ ] 定义 IPC 接口契约
-- [ ] 搭建测试框架
-
-### Phase 2 — 核心数据 & 搜索 (Week 2-3)
-- [ ] IBA 配方数据录入
-- [ ] FTS5 搜索实现
-- [ ] 配方列表页
-- [ ] 配方详情页
-
-### Phase 3 — 我的酒柜 (Week 4)
-- [ ] 库存管理
-- [ ] 推荐算法
-- [ ] 原料清单
-
-### Phase 4 — 进阶功能 (Week 5-6)
-- [ ] 制作步骤动画
-- [ ] 收藏功能
-- [ ] 自定义配方
-- [ ] 深色模式
-
-### Phase 5 — 打包 & 发布 (Week 7-8)
-- [ ] Android 构建
-- [ ] iOS 构建
-- [ ] 性能优化
-- [ ] 上架准备
-
-详细路线图请查看 [PRD-CocktailApp.md](./PRD-CocktailApp.md#9-开发路线图)
-
----
-
-## 📊 项目进度
-
-- **设计阶段**：✅ 已完成 (100%)
-- **开发阶段**：🚧 进行中 (0%)
-- **测试阶段**：⏸️ 未开始
-- **发布阶段**：⏸️ 未开始
-
----
-
-## 🤝 参与贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-### 贡献指南
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-### 开发规范
-- 遵循 [PRD](./PRD-CocktailApp.md) 中的技术规范
-- 遵循 [设计系统](./DESIGN-SYSTEM.md) 的 UI 规范
-- 编写单元测试（覆盖率 > 80%）
-- 提交信息使用约定式提交格式
-
----
-
-## 📜 许可证
-
-MIT License - 详见 [LICENSE](./LICENSE)
-
----
-
-## 📞 联系方式
-
-- **项目负责人**：yangmengying
-- **技术支持**：提交 Issue
-- **设计文档**：[README-DESIGN.md](./README-DESIGN.md)
-- **产品文档**：[PRD-CocktailApp.md](./PRD-CocktailApp.md)
-
----
-
-## 🙏 致谢
-
-- [Tauri](https://tauri.app/) - 跨平台框架
-- [React](https://react.dev/) - UI 框架
-- [Lucide](https://lucide.dev/) - 图标库
-- [Apple HIG](https://developer.apple.com/design/human-interface-guidelines/) - 设计指南
-- [IBA](https://iba-world.com/) - 官方配方来源
-
----
-
-*用极简的设计，探索调酒的无限可能 🍸*
+之前提交过的密钥仍可能存在于 Git 历史，应在服务商处轮换；本次没有重写历史或调用旧密钥。

@@ -1,119 +1,49 @@
-// Tauri Library Entry Point for Mobile Platforms
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+pub mod agent;
 mod commands;
-mod db;
-mod models;
-mod recommendation;
-pub mod error;
-pub mod repositories;
-pub mod services;
-
+pub mod db;
+pub mod menu;
+pub mod models;
+pub mod settings;
+pub mod trace;
 use commands::*;
-use tauri::Manager;  // 需要这个 trait 来使用 manage() 方法
+use std::sync::Arc;
+use tauri::Manager;
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(target_os = "android")]
-    {
-        if let Err(_) = db::init_android_assets() {
-            // Silent failure - continue anyway
-        }
-    }
-
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            // 配方相关命令
-            search_recipes,
-            get_recipe_by_id,
-            get_recipes,
-            create_custom_recipe,
-            update_recipe_image,
-            delete_recipe,
-            get_recommended_recipes,
-            get_favorite_recipes,
-            toggle_favorite,
-            get_recipe_history,
-            add_to_history,
-            
-            // 库存相关命令
-            commands::inventory::get_inventory,
-            commands::inventory::add_to_inventory,
-            commands::inventory::remove_from_inventory,
-            commands::inventory::get_all_ingredients,
-            commands::inventory::create_custom_ingredient,
-            commands::inventory::get_ingredients_by_category,
-            commands::inventory::search_ingredients,
-            commands::inventory::get_recipes_by_inventory,
-            
-            // 图片相关命令
-            get_image_url,
-            upload_image,
-            
-            // 待做相关命令
-            get_todos,
-            add_todo,
-            remove_todo,
-            is_todo,
-            
-            // 记录相关命令
-            get_drink_logs,
-            add_drink_log,
-            delete_drink_log,
-            
-            // 用户相关命令
-            get_user_profile,
-            update_user_profile,
-            get_user_stats,
-            update_mood_weather,
-            
-            // AI 调酒师命令
-            get_ai_recommendation,
-            submit_recommendation_feedback,
-            add_to_todo_from_ai,
-            get_todo_list_extended,
-            update_todo_status,
-            update_user_personality,
-            update_llm_config,
-            get_user_recommendation_history,
-            
-            // Chat commands
-            send_chat_message,
+            list_ingredients,
+            set_ingredient_owned,
+            search_menu,
+            save_custom_recipe,
+            delete_custom_recipe,
+            get_settings,
+            save_settings,
             get_chat_history,
             clear_chat_history,
-            
-
+            send_chat_message,
+            list_agent_traces
         ])
         .setup(|app| {
-            let handle = app.handle().clone();
-            
-            // 异步初始化数据库
-            tauri::async_runtime::block_on(async move {
-                let pool = match db::init_database(Some(&handle)).await {
-                    Ok(pool) => pool,
-                    Err(_) => panic!("Cannot start app without database"),
-                };
-                
-                let _ = db::health_check(&pool).await;
-
-                let session_service = match init_session_service().await {
-                    Ok(service) => std::sync::Arc::new(service),
-                    Err(_) => panic!("Cannot start app without session service"),
-                };
-                
-                let memory_service = match init_memory_service().await {
-                    Ok(service) => std::sync::Arc::new(service),
-                    Err(_) => panic!("Cannot start app without memory service"),
-                };
-                
-                handle.manage(pool);
-                handle.manage(session_service);
-                handle.manage(memory_service);
-            });
-            
+            let directory = db::data_directory()?;
+            let state = tauri::async_runtime::block_on(async {
+                let pool = db::open(&directory.join("cocktail.db")).await?;
+                settings::migrate_key(&pool, &directory).await?;
+                let session_url = format!(
+                    "sqlite:{}?mode=rwc",
+                    directory.join("cocktail-chat.db").display()
+                );
+                let sessions = adk_session::SqliteSessionService::new(&session_url).await?;
+                sessions.migrate().await?;
+                let companion = agent::Companion::new(pool, Arc::new(sessions)).await?;
+                anyhow::Ok(AppState {
+                    companion,
+                    directory,
+                })
+            })?;
+            app.manage(state);
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Mixology 启动失败，请检查本地数据库与应用日志");
 }
