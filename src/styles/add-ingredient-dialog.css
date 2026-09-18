@@ -1,0 +1,26 @@
+.add-ingredient-dialog {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 24px 70px var(--shadow-color);
+}
+.add-ingredient-dialog::backdrop { background: rgba(15, 20, 17, 0.45); }
+.add-ingredient-dialog h2 { font-size: 20px; }
+.add-ingredient-dialog > p { margin-top: 8px; font-size: 13px; }
+.ingredient-form { margin-top: 20px; }
+.ingredient-form fieldset { min-width: 0; }
+.ingredient-form .ingredient-owned { margin: 0; }
+.ingredient-existing, .ingredient-save-error { margin-top: 10px; font-size: 13px; overflow-wrap: anywhere; }
+.ingredient-save-error { color: var(--danger); }
+.ingredient-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.ingredient-dialog-actions .button { min-height: 40px; }
+
+@media (max-width: 380px) {
+  .add-ingredient-dialog { padding: 20px; }
+}

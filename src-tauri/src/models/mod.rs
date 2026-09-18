@@ -18,6 +18,26 @@ pub struct Ingredient {
     pub owned: bool,
 }
 
+fn default_owned() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewIngredientInput {
+    pub name: String,
+    pub category: String,
+    #[serde(default = "default_owned")]
+    pub owned: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddIngredientResult {
+    pub ingredient: Ingredient,
+    pub created: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct RecipeIngredient {

@@ -1,12 +1,88 @@
 use crate::models::*;
 use anyhow::{bail, ensure, Result};
-use sqlx::{Row, SqlitePool};
+use sqlx::{Row, SqliteConnection, SqlitePool};
 use std::collections::HashSet;
 
 pub async fn inventory(pool: &SqlitePool) -> Result<Vec<Ingredient>> {
     Ok(sqlx::query_as::<_, Ingredient>(
         "SELECT i.id, i.name_zh AS name, i.category, EXISTS(SELECT 1 FROM user_inventory u WHERE u.ingredient_id=i.id) AS owned FROM ingredients i ORDER BY owned DESC, i.name_zh"
     ).fetch_all(pool).await?)
+}
+
+async fn find_or_create_ingredient(
+    connection: &mut SqliteConnection,
+    name: &str,
+    category: &str,
+) -> Result<(Ingredient, bool)> {
+    let name = name.trim();
+    let normalized = name.to_lowercase();
+    // Rust normalization also handles Unicode case and whitespace that SQLite NOCASE/trim do not.
+    let existing = sqlx::query_as::<_, Ingredient>(
+        "SELECT i.id, i.name_zh AS name, i.category, EXISTS(SELECT 1 FROM user_inventory u WHERE u.ingredient_id=i.id) AS owned FROM ingredients i ORDER BY owned DESC, i.created_at, i.id",
+    )
+    .fetch_all(&mut *connection)
+    .await?
+    .into_iter()
+    .find(|ingredient| ingredient.name.trim().to_lowercase() == normalized);
+    if let Some(ingredient) = existing {
+        return Ok((ingredient, false));
+    }
+    let ingredient = Ingredient {
+        id: uuid::Uuid::new_v4().to_string(),
+        name: name.to_owned(),
+        category: category.to_owned(),
+        owned: false,
+    };
+    sqlx::query("INSERT INTO ingredients (id,name_zh,category,created_at,updated_at) VALUES (?,?,?,strftime('%s','now'),strftime('%s','now'))")
+        .bind(&ingredient.id)
+        .bind(&ingredient.name)
+        .bind(&ingredient.category)
+        .execute(&mut *connection)
+        .await?;
+    Ok((ingredient, true))
+}
+
+pub async fn add_ingredient(
+    pool: &SqlitePool,
+    input: &NewIngredientInput,
+) -> Result<AddIngredientResult> {
+    let name = input.name.trim();
+    ensure!(
+        !name.is_empty() && name.chars().count() <= 80,
+        "请填写 1–80 字的原料名称"
+    );
+    ensure!(
+        matches!(
+            input.category.as_str(),
+            "spirits"
+                | "liqueur"
+                | "juice"
+                | "syrup"
+                | "herb"
+                | "mixer"
+                | "dairy"
+                | "fruit"
+                | "other"
+        ),
+        "请选择有效的原料分类"
+    );
+    // Reserve the writer before lookup: old databases have no unique normalized-name index.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let (mut ingredient, created) =
+        find_or_create_ingredient(&mut tx, name, &input.category).await?;
+    if input.owned && !ingredient.owned {
+        sqlx::query("INSERT INTO user_inventory (id,ingredient_id,added_at,updated_at) VALUES (?,?,strftime('%s','now'),strftime('%s','now'))")
+            .bind(uuid::Uuid::new_v4().to_string())
+            .bind(&ingredient.id)
+            .execute(&mut *tx)
+            .await?;
+        ingredient.owned = true;
+    }
+    tx.commit().await?;
+    Ok(AddIngredientResult {
+        ingredient,
+        created,
+    })
 }
 
 pub async fn set_inventory(pool: &SqlitePool, id: &str, owned: bool) -> Result<()> {
@@ -174,7 +250,7 @@ pub async fn save_custom(pool: &SqlitePool, input: &RecipeInput) -> Result<Strin
     let mut names = HashSet::new();
     for i in &input.ingredients {
         ensure!(
-            !i.name.trim().is_empty() && i.name.chars().count() <= 80,
+            !i.name.trim().is_empty() && i.name.trim().chars().count() <= 80,
             "原料名称不能为空或过长"
         );
         ensure!(
@@ -194,7 +270,7 @@ pub async fn save_custom(pool: &SqlitePool, input: &RecipeInput) -> Result<Strin
         .id
         .clone()
         .unwrap_or_else(|| format!("custom-{}", uuid::Uuid::new_v4()));
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     if input.id.is_some() {
         let source: Option<String> = sqlx::query_scalar("SELECT source FROM recipes WHERE id=?")
             .bind(&id)
@@ -217,23 +293,9 @@ pub async fn save_custom(pool: &SqlitePool, input: &RecipeInput) -> Result<Strin
             .bind(&id).bind(input.name.trim()).bind(input.description.trim()).bind(input.method.trim()).bind(serde_json::to_string(&input.flavor)?).execute(&mut *tx).await?;
     }
     for (n, i) in input.ingredients.iter().enumerate() {
-        let existing: Option<String> = sqlx::query_scalar(
-            "SELECT id FROM ingredients WHERE trim(name_zh)=? COLLATE NOCASE LIMIT 1",
-        )
-        .bind(i.name.trim())
-        .fetch_optional(&mut *tx)
-        .await?;
-        let ingredient_id = match existing {
-            Some(id) => id,
-            None => {
-                let new_id = uuid::Uuid::new_v4().to_string();
-                sqlx::query("INSERT INTO ingredients (id,name_zh,category,created_at,updated_at) VALUES (?,?,'other',strftime('%s','now'),strftime('%s','now'))")
-                .bind(&new_id).bind(i.name.trim()).execute(&mut *tx).await?;
-                new_id
-            }
-        };
+        let (ingredient, _) = find_or_create_ingredient(&mut tx, &i.name, "other").await?;
         sqlx::query("INSERT INTO recipe_ingredients (id,recipe_id,ingredient_id,amount,unit,is_optional,display_order,created_at) VALUES (?,?,?,?,?,?,?,strftime('%s','now'))")
-            .bind(uuid::Uuid::new_v4().to_string()).bind(&id).bind(ingredient_id).bind(i.amount).bind(i.unit.trim()).bind(i.optional).bind(n as i32).execute(&mut *tx).await?;
+            .bind(uuid::Uuid::new_v4().to_string()).bind(&id).bind(ingredient.id).bind(i.amount).bind(i.unit.trim()).bind(i.optional).bind(n as i32).execute(&mut *tx).await?;
     }
     for (n, step) in input.steps.iter().enumerate() {
         sqlx::query("INSERT INTO recipe_steps (id,recipe_id,step_number,instruction,created_at) VALUES (?,?,?,?,strftime('%s','now'))")

@@ -5,6 +5,7 @@ pub mod db;
 pub mod menu;
 pub mod models;
 pub mod settings;
+pub mod streaming;
 pub mod trace;
 use commands::*;
 use std::sync::Arc;
@@ -14,6 +15,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             list_ingredients,
+            add_ingredient,
             set_ingredient_owned,
             search_menu,
             save_custom_recipe,

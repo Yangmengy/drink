@@ -1,5 +1,7 @@
 export interface Flavor { sweet: number; sour: number; bitter: number; strong: number }
 export interface Ingredient { id: string; name: string; category: string; owned: boolean }
+export interface NewIngredientInput { name: string; category: string; owned: boolean }
+export interface AddIngredientResult { ingredient: Ingredient; created: boolean }
 export interface RecipeIngredient { id: string; name: string; amount: number | null; unit: string | null; optional: boolean }
 export interface Recipe {
   id: string; name: string; nameEn: string; description: string; category: string;
@@ -18,4 +20,8 @@ export interface LocalRecommendationInput {
 }
 export interface LocalRecommendationResult { request: string; message: ChatMessage }
 export interface TraceEvent { phase: string; elapsedMs: number; detail: string }
+export type ChatStreamEvent =
+  | { type: 'text'; traceId: string; text: string }
+  | { type: 'trace'; traceId: string; event: TraceEvent };
+export interface LiveReply { traceId: string | null; text: string; events: TraceEvent[] }
 export interface AgentTrace { id: string; startedAt: number; durationMs: number; status: string; events: TraceEvent[]; error: string | null }

@@ -1,3 +1,4 @@
+use crate::streaming::{ChatStreamEvent, StreamSink};
 use adk_rust::{async_trait, futures::StreamExt, Llm, LlmRequest, LlmResponseStream};
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
@@ -30,6 +31,7 @@ pub struct Recorder {
     pub started_at: i64,
     start: Instant,
     events: Arc<Mutex<Vec<TraceEvent>>>,
+    stream: StreamSink,
 }
 impl Default for Recorder {
     fn default() -> Self {
@@ -38,7 +40,14 @@ impl Default for Recorder {
 }
 impl Recorder {
     pub fn start_turn() -> Self {
-        let trace = Self::new();
+        Self::start_streaming_turn(StreamSink::default())
+    }
+
+    pub fn start_streaming_turn(stream: StreamSink) -> Self {
+        let trace = Self {
+            stream,
+            ..Self::new()
+        };
         trace.push(
             "turn.start",
             "收到请求；检查模型配置或执行明确的本地酒单查询",
@@ -52,16 +61,30 @@ impl Recorder {
             started_at: chrono::Utc::now().timestamp(),
             start: Instant::now(),
             events: Arc::new(Mutex::new(vec![])),
+            stream: StreamSink::default(),
         }
     }
     pub fn push(&self, phase: &str, detail: impl Into<String>) {
         if let Ok(mut events) = self.events.lock() {
-            events.push(TraceEvent {
+            let event = TraceEvent {
                 phase: phase.into(),
                 elapsed_ms: self.start.elapsed().as_millis() as u64,
                 detail: detail.into(),
+            };
+            events.push(event.clone());
+            // Keep concurrent tool trace ordering identical in the live view and SQLite.
+            self.stream.send(ChatStreamEvent::Trace {
+                trace_id: self.id.clone(),
+                event,
             });
         }
+    }
+
+    pub fn text(&self, text: impl Into<String>) {
+        self.stream.send(ChatStreamEvent::Text {
+            trace_id: self.id.clone(),
+            text: text.into(),
+        });
     }
     pub async fn finish(&self, pool: &SqlitePool, ok: bool) -> anyhow::Result<()> {
         let last_phase = self

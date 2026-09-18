@@ -1,4 +1,8 @@
-use crate::{menu, models::*, settings, trace::Recorder};
+use crate::{
+    menu, models::*, settings,
+    streaming::{ReplyStream, StreamSink},
+    trace::Recorder,
+};
 use adk_rust::model::openai::{OpenAIClient, OpenAIConfig};
 use adk_rust::{
     agent::LlmAgentBuilder, futures::StreamExt, runner::Runner, tool::FunctionTool, Content, Event,
@@ -213,8 +217,34 @@ impl Companion {
             .await
     }
 
+    pub async fn reply_streaming(
+        &self,
+        model: Arc<dyn Llm>,
+        profile: &Settings,
+        message: &str,
+        stream: StreamSink,
+    ) -> Result<ChatMessage> {
+        self.reply_traced(
+            model,
+            profile,
+            message,
+            Recorder::start_streaming_turn(stream),
+        )
+        .await
+    }
+
     pub async fn reply_configured(&self, directory: &Path, message: &str) -> Result<ChatMessage> {
-        let trace = Recorder::start_turn();
+        self.reply_configured_streaming(directory, message, StreamSink::default())
+            .await
+    }
+
+    pub async fn reply_configured_streaming(
+        &self,
+        directory: &Path,
+        message: &str,
+        stream: StreamSink,
+    ) -> Result<ChatMessage> {
+        let trace = Recorder::start_streaming_turn(stream);
         trace.push("config.start", "读取本地模型配置与密钥");
         let result = async {
             let key = settings::read_optional_key(directory).map_err(|e| {
@@ -229,7 +259,7 @@ impl Companion {
                 trace.push("fallback.start", "原因：未配置 API Key；返回本地模式说明");
                 trace.push("fallback.guidance", "没有解析自由文本，没有查询或推荐酒品");
                 let reply = Reply {
-                    reply: "暂时还没有连接聊天模型，我现在无法理解这句话并自然陪聊。你可以使用下方的本地酒单查询，按已有材料和明确的口味条件找酒；也可以在设置中配置模型后继续聊。".into(),
+                    reply: "暂时还没有连接聊天模型，我现在无法理解这句话并自然陪聊。你可以点开顶部的“调整推荐条件”，按已有材料和明确的口味条件找酒；也可以在设置中配置模型后继续聊。".into(),
                     recipe_ids: vec![], trace_id: None, mode: ReplyMode::Local,
                 };
                 return self.save_reply(message, reply, vec![], &trace).await;
@@ -400,7 +430,7 @@ impl Companion {
             .agent(Arc::new(agent))
             .session_service(staging)
             .run_config(RunConfig {
-                streaming_mode: StreamingMode::None,
+                streaming_mode: StreamingMode::SSE,
                 ..Default::default()
             })
             .build()?;
@@ -412,14 +442,14 @@ impl Companion {
                     Content::new("user").with_text(message.trim()),
                 )
                 .await?;
-            let mut final_text = String::new();
+            let mut reply = ReplyStream::default();
             while let Some(event) = stream.next().await {
                 let event = event?;
-                if event.author == "companion" && event.is_final_response() {
-                    final_text = text(&event);
+                if let Some(text) = reply.push(&event) {
+                    trace.text(text);
                 }
             }
-            anyhow::Ok(final_text)
+            reply.finish()
         };
         let final_text = tokio::time::timeout(Duration::from_secs(90), turn)
             .await
@@ -459,6 +489,7 @@ impl Companion {
             .append_event(SESSION, reply_event.clone())
             .await?;
         trace.push("session.saved", "对话已保存");
+        trace.text(reply.reply.clone());
         Ok(ChatMessage {
             mode: reply.mode,
             trace_id: Some(trace.id.clone()),

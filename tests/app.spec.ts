@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // Rust integration tests independently exercise the database and actual ADK tool loop.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    const ingredients = [{ id: 'gin', name: '金酒', category: 'spirit', owned: false }, { id: 'tonic', name: '汤力水', category: 'mixer', owned: false }];
+    const ingredients = [{ id: 'gin', name: '金酒', category: 'spirits', owned: false }, { id: 'tonic', name: '汤力水', category: 'mixer', owned: false }];
     const recipes = [{ id: 'gin-tonic', name: '金汤力', nameEn: 'Gin & Tonic', description: '清爽的金酒与汤力水。', category: 'Gin', source: 'builtin', image: 'gin_tonic.png', method: '直调', flavor: { sweet: 1, sour: 2, bitter: 2, strong: 2 }, ingredients: [{ id: 'gin', name: '金酒', amount: 45, unit: 'ml', optional: false }, { id: 'tonic', name: '汤力水', amount: 100, unit: 'ml', optional: false }], steps: ['杯中加冰，加入材料轻轻搅拌。'], missing: ['金酒', '汤力水'], canMake: false }];
     let settings = { name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: true, dataDirectory: '/local/cocktail-app' };
     const history: unknown[] = [];
@@ -12,6 +12,22 @@ test.beforeEach(async ({ page }) => {
     let failNext = false;
     let failLocal = false;
     let failSave = false;
+    let failTrace = false;
+    let failClear = false;
+    let clearCalls = 0;
+    let failIngredient = false;
+    let ingredientCalls = 0;
+    let callbackId = 0;
+    const callbacks = new Map<number, (value: unknown) => void>();
+    const streamIndexes = new Map<number, number>();
+    let activeChannel: { id: number } | undefined;
+    let activeTraceId = '';
+    const emitStream = (event: Record<string, unknown>) => {
+      if (!activeChannel) return;
+      const index = streamIndexes.get(activeChannel.id) ?? 0;
+      streamIndexes.set(activeChannel.id, index + 1);
+      callbacks.get(activeChannel.id)?.({ index, message: { traceId: activeTraceId, ...event } });
+    };
     let holdSave: Promise<void> | undefined;
     let releaseSave: (() => void) | undefined;
     let holdMessage: Promise<void> | undefined;
@@ -20,12 +36,24 @@ test.beforeEach(async ({ page }) => {
     let releaseLocal: (() => void) | undefined;
     let holdInventory: Promise<void> | undefined;
     let releaseInventory: (() => void) | undefined;
+    let holdClear: Promise<void> | undefined;
+    let releaseClear: (() => void) | undefined;
+    let holdIngredient: Promise<void> | undefined;
+    let releaseIngredient: (() => void) | undefined;
     function menu() { return recipes.map(r => { const missing = r.ingredients.filter(i => !i.optional && !ingredients.some(s => s.id === i.id && s.owned)).map(i => i.name); return { ...r, missing, canMake: missing.length === 0 }; }); }
     Object.assign(window, {
       __failNextMessage: () => { failNext = true; },
       __setConfigured: (value: boolean) => { settings.apiKeyConfigured = value; },
       __failNextLocal: () => { failLocal = true; },
       __failNextSave: () => { failSave = true; },
+      __failNextTrace: () => { failTrace = true; },
+      __failNextClear: () => { failClear = true; },
+      __clearCalls: () => clearCalls,
+      __failNextIngredient: () => { failIngredient = true; },
+      __ingredientCalls: () => ingredientCalls,
+      __clearTraces: () => { traces.length = 0; },
+      __streamText: (text: string) => emitStream({ type: 'text', text }),
+      __streamTrace: (phase: string) => emitStream({ type: 'trace', event: { phase, elapsedMs: 0, detail: `执行 ${phase}` } }),
       __holdSave: () => { holdSave = new Promise(resolve => { releaseSave = resolve; }); },
       __releaseSave: () => { releaseSave?.(); },
       __holdMessage: () => { holdMessage = new Promise(resolve => { releaseMessage = resolve; }); },
@@ -34,15 +62,44 @@ test.beforeEach(async ({ page }) => {
       __releaseLocal: () => { releaseLocal?.(); },
       __holdInventory: () => { holdInventory = new Promise(resolve => { releaseInventory = resolve; }); },
       __releaseInventory: () => { releaseInventory?.(); },
-      __TAURI_INTERNALS__: { invoke: async (command: string, args: Record<string, any> = {}) => {
+      __holdClear: () => { holdClear = new Promise(resolve => { releaseClear = resolve; }); },
+      __releaseClear: () => { releaseClear?.(); },
+      __holdIngredient: () => { holdIngredient = new Promise(resolve => { releaseIngredient = resolve; }); },
+      __releaseIngredient: () => { releaseIngredient?.(); },
+      __TAURI_INTERNALS__: {
+        transformCallback: (callback: (value: unknown) => void) => { const id = ++callbackId; callbacks.set(id, callback); return id; },
+        unregisterCallback: (id: number) => { callbacks.delete(id); },
+        invoke: async (command: string, args: Record<string, any> = {}) => {
         if (command === 'get_chat_history') return [...history];
         if (command === 'list_ingredients') return ingredients.map(i => ({ ...i }));
         if (command === 'search_menu') return menu();
         if (command === 'get_settings') return { ...settings };
         if (command === 'save_settings') { settings = { ...settings, ...args.input, apiKeyConfigured: args.input.apiKey == null ? settings.apiKeyConfigured : args.input.apiKey !== '' }; return { ...settings }; }
-        if (command === 'list_agent_traces') return [...traces];
+        if (command === 'list_agent_traces') { if (failTrace) { failTrace = false; throw new Error('模拟链路读取失败'); } return [...traces]; }
         if (command === 'set_ingredient_owned') { const hold = holdInventory; holdInventory = undefined; await hold; ingredients.find(i => i.id === args.id)!.owned = args.owned; return; }
-        if (command === 'clear_chat_history') { history.length = 0; return; }
+        if (command === 'add_ingredient') {
+          ingredientCalls++;
+          const hold = holdIngredient; holdIngredient = undefined; await hold;
+          if (failIngredient) { failIngredient = false; throw new Error('模拟原料保存失败，请重试'); }
+          const { name: rawName, category, owned } = args.input;
+          const name = rawName.trim();
+          if (!name || Array.from(name).length > 80) throw new Error('原料名称须为 1–80 个字符');
+          if (!['spirits', 'liqueur', 'juice', 'syrup', 'herb', 'mixer', 'dairy', 'fruit', 'other'].includes(category)) throw new Error('原料分类无效');
+          let ingredient = ingredients.find(i => i.name.trim().toLowerCase() === name.toLowerCase());
+          const created = !ingredient;
+          if (ingredient) { if (owned) ingredient.owned = true; }
+          else {
+            ingredient = { id: `ingredient-${ingredientCalls}`, name, category, owned };
+            ingredients.push(ingredient);
+          }
+          return { ingredient: { ...ingredient }, created };
+        }
+        if (command === 'clear_chat_history') {
+          clearCalls++;
+          const hold = holdClear; holdClear = undefined; await hold;
+          if (failClear) { failClear = false; throw new Error('模拟清空失败，请重试'); }
+          history.length = 0; return;
+        }
         if (command === 'delete_custom_recipe') { const index = recipes.findIndex(r => r.id === args.id); if (index >= 0) recipes.splice(index, 1); return; }
         if (command === 'save_custom_recipe') {
           const hold = holdSave; holdSave = undefined; await hold;
@@ -71,6 +128,8 @@ test.beforeEach(async ({ page }) => {
           return { request, message };
         }
         if (command === 'send_chat_message') {
+          activeChannel = args.onEvent;
+          activeTraceId = `turn-${history.length}`;
           const hold = holdMessage; holdMessage = undefined; await hold;
           if (failNext) {
             failNext = false;
@@ -80,7 +139,7 @@ test.beforeEach(async ({ page }) => {
           }
           if (!settings.apiKeyConfigured) {
             const id = `local-guidance-${history.length}`;
-            const response = { id, role: 'assistant', mode: 'local', text: '暂时还没有连接聊天模型，无法智能陪聊。请使用下方本地查询。', recipes: [], traceId: id };
+            const response = { id, role: 'assistant', mode: 'local', text: '暂时还没有连接聊天模型，无法智能陪聊。请点开顶部的“调整推荐条件”。', recipes: [], traceId: id };
             history.push({ id: `${id}-user`, role: 'user', text: args.message, recipes: [] }, response);
             traces.push({ id, startedAt: 1789600000, durationMs: 10, status: 'local', events: [{ phase: 'fallback.guidance', elapsedMs: 10, detail: '未配置 API Key' }], error: null });
             return response;
@@ -110,6 +169,132 @@ test('four entry points, inventory and menu availability', async ({ page }) => {
   await expect(page.getByText('杯中加冰，加入材料轻轻搅拌。')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
+});
+
+test('added ingredients survive navigation and make custom recipes available to local recommendations', async ({ page }) => {
+  await page.goto('/bar');
+  await page.getByRole('button', { name: '添加原料', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加原料', exact: true });
+  await expect(dialog.getByLabel('我已有这项原料')).toBeChecked();
+  await dialog.getByLabel('原料名称', { exact: true }).fill('  柚子汁  ');
+  await dialog.getByRole('combobox', { name: '原料分类', exact: true }).selectOption('juice');
+  await dialog.getByRole('button', { name: '保存原料', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '柚子汁', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.screenshot({ path: 'test-results/ingredient-added-desktop.png', fullPage: true });
+  await page.getByRole('link', { name: '自定义', exact: true }).click();
+  await expect(page.locator('#ingredient-names option[value="柚子汁"]')).toHaveCount(1);
+  await page.getByRole('link', { name: '酒柜', exact: true }).click();
+  await expect(page.getByRole('button', { name: '柚子汁', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('tab', { name: /酒单/ }).click();
+  await page.getByRole('link', { name: '添加酒品', exact: true }).click();
+  await page.getByLabel('酒品名称').fill('柚子微风');
+  await page.getByRole('combobox', { name: '原料 1', exact: true }).fill('柚子汁');
+  await page.getByRole('textbox', { name: '步骤 1', exact: true }).fill('柚子汁加冰，轻轻搅拌。');
+  await page.getByRole('button', { name: '保存到酒单' }).click();
+  await expect(page.getByRole('button', { name: /柚子微风/ })).toContainText('材料齐了');
+  await page.evaluate(() => (window as any).__setConfigured(false));
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
+  await page.getByLabel('酒名或原料关键词').fill('柚子汁');
+  await page.getByRole('button', { name: '用现有材料推荐', exact: true }).click();
+  await expect(page.getByRole('button', { name: /柚子微风/ })).toContainText('材料齐了');
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(1);
+});
+
+test('adding an existing ingredient reuses it, preserves ownership and refreshes earlier chat cards', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('说点什么').fill('推荐一杯酒');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.getByText('缺 2 种：金酒、汤力水')).toBeVisible();
+  await page.getByRole('link', { name: '酒柜', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加原料', exact: true });
+  for (const alreadyOwned of [false, true]) {
+    await page.getByRole('button', { name: '添加原料', exact: true }).click();
+    await dialog.getByLabel('原料名称', { exact: true }).fill('  金酒  ');
+    await expect(dialog.getByRole('combobox', { name: '原料分类', exact: true })).toHaveValue('spirits');
+    await expect(dialog.getByRole('combobox', { name: '原料分类', exact: true })).toBeDisabled();
+    await expect(dialog.getByLabel('我已有这项原料')).toBeChecked();
+    if (alreadyOwned) await expect(dialog.getByLabel('我已有这项原料')).toBeDisabled();
+    else await expect(dialog.getByLabel('我已有这项原料')).toBeEnabled();
+    await dialog.getByRole('button', { name: '保存原料', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '金酒', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('textbox', { name: '搜索原料' }).fill('');
+    await expect(page.locator('.inventory-item')).toHaveCount(2);
+  }
+  await page.getByRole('tab', { name: /酒单/ }).click();
+  await expect(page.getByRole('button', { name: /金汤力/ })).toContainText('缺 1 种：汤力水');
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await expect(page.getByRole('button', { name: /金汤力/ })).toContainText('缺 1 种：汤力水');
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(2);
+});
+
+test('ingredient cancellation and blank names do not save, while pending failures preserve a retryable form', async ({ page }) => {
+  await page.goto('/bar');
+  const addButton = page.getByRole('button', { name: '添加原料', exact: true });
+  const dialog = page.getByRole('dialog', { name: '添加原料', exact: true });
+  await addButton.click();
+  await dialog.getByLabel('原料名称', { exact: true }).fill('这项不要保存');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '这项不要保存', exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(0);
+  await addButton.click();
+  await dialog.getByLabel('原料名称', { exact: true }).fill('   ');
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(0);
+  await dialog.getByLabel('原料名称', { exact: true }).fill('柠檬糖浆');
+  await dialog.getByRole('combobox', { name: '原料分类', exact: true }).selectOption('syrup');
+  await dialog.getByLabel('我已有这项原料').uncheck();
+  await page.evaluate(() => { (window as any).__failNextIngredient(); (window as any).__holdIngredient(); });
+  await dialog.getByRole('button', { name: '保存原料', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '正在保存…', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeDisabled();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(1);
+  await page.evaluate(() => (window as any).__releaseIngredient());
+  await expect(dialog.getByRole('alert')).toContainText('模拟原料保存失败');
+  await expect(dialog.getByLabel('原料名称', { exact: true })).toHaveValue('柠檬糖浆');
+  await expect(dialog.getByRole('combobox', { name: '原料分类', exact: true })).toHaveValue('syrup');
+  await expect(dialog.getByLabel('我已有这项原料')).not.toBeChecked();
+  await page.screenshot({ path: 'test-results/ingredient-save-error.png', fullPage: true });
+  await dialog.getByRole('button', { name: '保存原料', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '柠檬糖浆', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => page.evaluate(() => (window as any).__ingredientCalls())).toBe(2);
+});
+
+test('ingredient dialog fits 350px and newly added unowned ingredients remain visible after owned-only filtering', async ({ page }) => {
+  await page.setViewportSize({ width: 350, height: 700 });
+  await page.goto('/bar');
+  await page.getByLabel('只看已有').check();
+  await page.getByRole('textbox', { name: '搜索原料' }).fill('金酒');
+  await page.getByRole('button', { name: '添加原料', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加原料', exact: true });
+  await dialog.getByLabel('原料名称', { exact: true }).fill('粉红西柚汁（无糖）');
+  await dialog.getByRole('combobox', { name: '原料分类', exact: true }).selectOption('juice');
+  await dialog.getByLabel('我已有这项原料').uncheck();
+  await expect(dialog.getByRole('button', { name: '保存原料', exact: true })).toBeInViewport();
+  await expect.poll(() => dialog.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
+      && Array.from(el.querySelectorAll('input, select, button')).every(control => {
+        const bounds = control.getBoundingClientRect();
+        return bounds.left >= rect.left && bounds.right <= rect.right;
+      });
+  })).toBe(true);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/add-ingredient-mobile.png', fullPage: true });
+  await dialog.getByRole('button', { name: '保存原料', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '粉红西柚汁（无糖）', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: '粉红西柚汁（无糖）', exact: true })).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/ingredient-unowned-mobile.png', fullPage: true });
 });
 
 test('custom recipe saves to menu and can be edited', async ({ page }) => {
@@ -142,21 +327,87 @@ test('chat error preserves draft, retry succeeds, trace opens and context clears
   await expect(page.getByLabel('说点什么')).toHaveValue('今天想聊聊');
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.getByText('我在。我们慢慢聊。')).toBeVisible();
-  await page.getByRole('link', { name: '查看本轮链路' }).click();
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText('model.start')).toBeInViewport();
-  await expect(page.locator('.trace-selected')).toBeFocused();
-  await page.getByRole('link', { name: '聊天', exact: true }).click();
-  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(page.getByRole('region', { name: '链路详情' })).toHaveCount(0);
   await page.getByRole('button', { name: '清空对话' }).click();
+  await page.getByRole('dialog', { name: '清空这段对话？' }).getByRole('button', { name: '确认清空' }).click();
   await expect(page.getByText('今天过得怎么样？')).toBeVisible();
+});
+
+test('clear chat requires confirmation and cancel or Escape preserves history and draft', async ({ page }) => {
+  await page.goto('/');
+  const clearButton = page.getByRole('button', { name: '清空对话', exact: true });
+  await expect(clearButton).toBeDisabled();
+  await page.getByLabel('说点什么').fill('这段对话要保留');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.locator('.message')).toHaveCount(2);
+  await page.getByLabel('说点什么').fill('还没发出的草稿');
+  const dialog = page.getByRole('dialog', { name: '清空这段对话？' });
+  await clearButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '取消' })).toBeFocused();
+  await expect(dialog).toContainText('聊天记录和 Agent 上下文将被清除，无法恢复。');
+  await expect.poll(() => page.evaluate(() => (window as any).__clearCalls())).toBe(0);
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(clearButton).toBeFocused();
+  await clearButton.click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.message')).toHaveCount(2);
+  await expect(page.getByLabel('说点什么')).toHaveValue('还没发出的草稿');
+  await expect.poll(() => page.evaluate(() => (window as any).__clearCalls())).toBe(0);
+});
+
+test('clear chat blocks duplicates, keeps failures visible and allows a confirmed retry', async ({ page }) => {
+  await page.setViewportSize({ width: 350, height: 700 });
+  await page.goto('/');
+  await page.getByLabel('说点什么').fill('测试清空失败');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.locator('.message')).toHaveCount(2);
+  await page.getByLabel('说点什么').fill('清空后也保留草稿');
+  await page.evaluate(() => { (window as any).__failNextClear(); (window as any).__holdClear(); });
+  await page.getByRole('button', { name: '清空对话', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '清空这段对话？' });
+  await dialog.getByRole('button', { name: '确认清空' }).click();
+  await expect(dialog.getByRole('button', { name: '正在清空…' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '取消' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__clearCalls())).toBe(1);
+  await page.evaluate(() => (window as any).__releaseClear());
+  await expect(dialog.getByRole('alert')).toContainText('模拟清空失败');
+  await expect(page.locator('.message')).toHaveCount(2);
+  await page.screenshot({ path: 'test-results/clear-chat-confirmation-mobile.png' });
+  await dialog.getByRole('button', { name: '确认清空' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.message')).toHaveCount(0);
+  await expect(page.locator('.welcome h2')).toBeVisible();
+  await expect(page.getByLabel('说点什么')).toHaveValue('清空后也保留草稿');
+  await expect(page.getByRole('button', { name: '清空对话', exact: true })).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => (window as any).__clearCalls())).toBe(2);
 });
 
 test('desktop and mobile views have no overflow and remain operable', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
+  const composerFits = () => page.evaluate(() => {
+    const box = document.querySelector('.composer-dock')!.getBoundingClientRect();
+    const send = document.querySelector('.send-button')!.getBoundingClientRect();
+    const bottom = window.matchMedia('(max-width: 720px)').matches ? document.querySelector('.sidebar')!.getBoundingClientRect().top : innerHeight;
+    return box.height === 45 && bottom - box.bottom === 5 && send.width === 28 && send.height === 28;
+  });
+  await expect.poll(composerFits).toBe(true);
   await page.screenshot({ path: 'test-results/chat-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(page.getByRole('button', { name: '发送消息' })).toBeVisible();
+  await expect.poll(composerFits).toBe(true);
+  await page.getByLabel('说点什么').fill('多行草稿在输入框内部滚动。\n'.repeat(15));
+  await expect.poll(composerFits).toBe(true);
+  await expect.poll(() => page.getByLabel('说点什么').evaluate(el => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === 'auto')).toBe(true);
+  await page.getByLabel('说点什么').fill('');
   await page.screenshot({ path: 'test-results/chat-mobile.png', fullPage: true });
   for (const name of ['酒柜', '自定义', '设置']) {
     await page.getByRole('link', { name, exact: true }).click();
@@ -165,6 +416,105 @@ test('desktop and mobile views have no overflow and remain operable', async ({ p
   await page.getByRole('link', { name: '自定义', exact: true }).click();
   await page.screenshot({ path: 'test-results/custom-mobile.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('message traces expand independently in place, retry reads and explain expired records', async ({ page }) => {
+  await page.goto('/');
+  for (const text of ['第一轮聊天', '第二轮聊天']) {
+    await page.getByLabel('说点什么').fill(text);
+    await page.getByRole('button', { name: '发送消息' }).click();
+    await expect(page.getByRole('button', { name: '发送消息' })).toBeDisabled();
+    await expect(page.getByText('正在听你说，也在想怎么回答…')).toHaveCount(0);
+  }
+  const first = page.locator('.message.assistant').nth(0);
+  const second = page.locator('.message.assistant').nth(1);
+  await expect(first.getByRole('region', { name: '链路详情' })).toContainText('model.start');
+  await expect(second.getByRole('button', { name: '查看本轮链路' })).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(() => first.evaluate(el => el.querySelector('.message-author')!.nextElementSibling?.classList.contains('chat-trace-panel'))).toBe(true);
+  await second.getByRole('button', { name: '查看本轮链路' }).click();
+  await page.evaluate(() => (window as any).__failNextTrace());
+  await second.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(second.getByRole('alert')).toContainText('模拟链路读取失败');
+  await second.getByRole('button', { name: '重新加载链路' }).click();
+  await expect(second.getByRole('region', { name: '链路详情' })).toContainText('turn.complete');
+  await first.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(first.getByRole('region', { name: '链路详情' })).toHaveCount(0);
+  await expect(second.getByRole('region', { name: '链路详情' })).toBeVisible();
+  await second.getByRole('button', { name: '查看本轮链路' }).click();
+  await page.evaluate(() => (window as any).__clearTraces());
+  await second.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(second.getByRole('region', { name: '链路详情' })).toContainText('已被清理');
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('reply text and compact trace steps arrive before completion and survive navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 350, height: 700 });
+  await page.goto('/');
+  await page.evaluate(() => (window as any).__holdMessage());
+  await page.getByLabel('说点什么').fill('这是正在阅读的旧消息。'.repeat(70));
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await page.evaluate(() => {
+    for (const phase of ['model.start', 'model.first_response']) (window as any).__streamTrace(phase);
+    (window as any).__streamText('我在。');
+  });
+  await expect(page.locator('.streaming-reply')).toHaveText('我在。');
+  const trace = page.locator('.message.assistant .chat-trace-panel');
+  await expect(trace.locator('li:visible')).toHaveCount(2);
+  await expect(trace.locator('time, code, .chat-trace-meta, .trace-time, ol')).toHaveCount(0);
+  await expect.poll(() => trace.locator('li').first().evaluate(el => getComputedStyle(el, '::before').content)).toBe('"·"');
+  await page.evaluate(() => { (window as any).__streamTrace('tool.start'); (window as any).__streamTrace('tool.complete'); });
+  await expect(trace.locator('li:visible')).toHaveCount(0);
+  await expect(trace.getByRole('button', { name: '查看本轮链路' })).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(() => trace.evaluate(el => el.getBoundingClientRect().height)).toBe(38);
+  await trace.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(trace.locator('li:visible')).toHaveCount(4);
+  await page.evaluate(() => (window as any).__streamTrace('output.validate'));
+  await expect(trace.locator('li:visible')).toHaveCount(5);
+  await trace.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect.poll(() => trace.evaluate(el => el.getBoundingClientRect().height)).toBe(38);
+  await trace.getByRole('button', { name: '查看本轮链路' }).click();
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    (window as any).__streamText('我在。流式回复还在继续。');
+  });
+  await expect(page.locator('.streaming-reply')).toHaveText('我在。流式回复还在继续。');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.getByLabel('说点什么').fill('下一句草稿');
+  await page.getByRole('link', { name: '酒柜', exact: true }).click();
+  await page.evaluate(() => (window as any).__streamText('我在。我们慢慢聊。'));
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await expect(page.locator('.streaming-reply')).toHaveText('我在。我们慢慢聊。');
+  await expect(page.getByLabel('说点什么')).toHaveValue('下一句草稿');
+  await page.evaluate(() => (window as any).__releaseMessage());
+  await expect(page.locator('.streaming-reply')).toHaveCount(0);
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.locator('.message.assistant .assistant-content > p')).toHaveText('我在。我们慢慢聊。');
+  await page.evaluate(() => (window as any).__streamText('迟到的旧片段'));
+  await expect(page.getByText('迟到的旧片段')).toHaveCount(0);
+  await expect(page.getByText('model.start', { exact: true })).toBeVisible();
+  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+  await expect.poll(() => page.evaluate(() => {
+    const messages = document.querySelectorAll('.message.assistant');
+    const gap = document.querySelector('.composer-dock')!.getBoundingClientRect().top - messages[messages.length - 1].getBoundingClientRect().bottom;
+    return Math.abs(gap - 5) < 1;
+  })).toBe(true);
+  await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
+});
+
+test('a failed stream restores the draft and never saves a partial assistant message', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => { (window as any).__holdMessage(); (window as any).__failNextMessage(); });
+  await page.getByLabel('说点什么').fill('流式失败后要保留的原消息');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await page.evaluate(() => { (window as any).__streamTrace('model.start'); (window as any).__streamText('尚未生成完整'); });
+  await expect(page.locator('.streaming-reply')).toHaveText('尚未生成完整');
+  await page.evaluate(() => (window as any).__releaseMessage());
+  await expect(page.getByLabel('说点什么')).toHaveValue('流式失败后要保留的原消息');
+  await expect(page.locator('.message.assistant')).toHaveCount(0);
+  await expect(page.locator('.streaming-reply')).toHaveCount(0);
+  await page.getByRole('button', { name: '重试这条消息' }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.locator('.message.assistant .assistant-content > p')).toHaveText('我在。我们慢慢聊。');
 });
 
 
@@ -226,6 +576,7 @@ test('inventory edits save independently and refresh previous chat cards', async
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.getByText('缺 2 种：金酒、汤力水')).toBeVisible();
   await page.getByRole('link', { name: '酒柜', exact: true }).click();
+  await expect(page.locator('.inventory-item')).toHaveCount(2);
   const order = await page.locator('.inventory-item').allTextContents();
   await page.evaluate(() => (window as any).__holdInventory());
   await page.getByRole('button', { name: '金酒', exact: true }).click();
@@ -313,9 +664,9 @@ test('without an API the chat labels local mode and never pretends to understand
   await expect(page.locator('.message.assistant')).toContainText('无法智能陪聊');
   await expect(page.locator('.recommendations')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.getByRole('link', { name: '查看本轮链路' }).click();
-  await expect(page.locator('.trace-selected')).toContainText('本地完成');
-  await expect(page.locator('.trace-selected')).toContainText('fallback.guidance');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('.chat-trace-detail')).not.toContainText('本地完成');
+  await expect(page.locator('.chat-trace-detail')).toContainText('fallback.guidance');
 });
 
 test('offline menu queries retain strict filters and return real missing-material cards', async ({ page }) => {
@@ -349,7 +700,7 @@ test('API failure offers local lookup with its trace and preserves the original 
   await page.getByLabel('说点什么').fill('原消息先不要丢');
   await page.getByRole('button', { name: '发送消息' }).click();
   await page.getByRole('button', { name: '使用本地推荐', exact: true }).click();
-  await expect(page.getByRole('link', { name: '查看失败链路' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看失败链路' })).toBeVisible();
   await page.getByLabel('酒名或原料关键词').fill('金酒');
   await page.evaluate(() => (window as any).__failNextLocal());
   await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
@@ -358,10 +709,10 @@ test('API failure offers local lookup with its trace and preserves the original 
   await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
   await expect(page.getByRole('button', { name: /金汤力/ })).toBeVisible();
   await expect(page.getByLabel('说点什么')).toHaveValue('原消息先不要丢');
-  await page.getByRole('link', { name: '查看本轮链路' }).click();
-  await expect(page.locator('.trace-selected')).toContainText('00000000-0000-4000-8000-000000000001');
-  await expect(page.locator('.trace-selected')).toContainText('本地完成');
-  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByRole('button', { name: '查看本轮链路' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('.message.assistant .chat-trace-detail')).toContainText('来源失败链路：00000000-0000-4000-8000-000000000001');
+  await expect(page.locator('.message.assistant .chat-trace-detail')).not.toContainText('本地完成');
   await page.getByRole('button', { name: '重试这条消息' }).click();
   await expect(page.getByText('我在。我们慢慢聊。')).toBeVisible();
   await expect(page.locator('.message.user').filter({ hasText: '原消息先不要丢' })).toHaveCount(1);
@@ -403,8 +754,8 @@ test('empty chat stays at the top on narrow screens and failed sends do not brin
   await expect(page.getByRole('button', { name: '重试这条消息' })).toBeInViewport();
   await page.getByRole('button', { name: '重试这条消息' }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(1);
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '清空对话' }).click();
+  await page.getByRole('dialog', { name: '清空这段对话？' }).getByRole('button', { name: '确认清空' }).click();
   await expect(page.locator('.welcome h2')).toBeVisible();
   await expect.poll(welcomeIsBelowHeader).toBe(true);
   await page.getByRole('link', { name: '设置', exact: true }).click();
@@ -427,6 +778,11 @@ test('new replies do not interrupt reading older messages, and return-to-latest 
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.getByText('正在听你说，也在想怎么回答…')).toBeInViewport();
   await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => {
+    const header = document.querySelector('.page-header')!.getBoundingClientRect();
+    const options = document.querySelector('.local-options')!.getBoundingClientRect();
+    return window.scrollY > 0 && header.top === 0 && options.top - header.bottom === 5;
+  })).toBe(true);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await expect(page.getByRole('button', { name: '回到最新' })).toBeVisible();
   await page.evaluate(() => (window as any).__releaseMessage());
@@ -435,6 +791,7 @@ test('new replies do not interrupt reading older messages, and return-to-latest 
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await page.getByRole('button', { name: '回到最新' }).click();
   await expect(page.locator('.message.assistant').last()).toBeInViewport();
+  await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
 });
 
 for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 }]) {
@@ -462,8 +819,8 @@ for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 
     await expect(page.getByLabel('酒名或原料关键词')).toBeHidden();
     await expect.poll(() => page.evaluate(() => {
       const request = document.querySelector('.message.user')!.getBoundingClientRect();
-      const reply = document.querySelector('.message.assistant > p')!.getBoundingClientRect();
-      const header = document.querySelector('.page-header')!.getBoundingClientRect();
+      const reply = document.querySelector('.message.assistant .assistant-content > p')!.getBoundingClientRect();
+      const header = document.querySelector('.chat-top')!.getBoundingClientRect();
       const composer = document.querySelector('.composer-dock')!.getBoundingClientRect();
       return request.top >= header.bottom && reply.top >= request.bottom && reply.bottom <= composer.top;
     })).toBe(true);

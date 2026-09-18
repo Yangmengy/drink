@@ -1,0 +1,49 @@
+/* 固定 45px 输入区；长草稿在框内滚动，不挤压聊天内容。 */
+.chat-page .composer-dock {
+  position: fixed;
+  bottom: 5px;
+  left: calc(50% + 116px);
+  width: min(760px, calc(100% - 328px));
+  height: 45px;
+  padding: 5px 5px 5px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.chat-page .composer-dock:focus-within {
+  border-color: var(--accent);
+}
+
+.chat-page .composer {
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+}
+
+.chat-page .composer textarea {
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  padding: 3px 0;
+  line-height: 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-page .composer .send-button {
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 720px) {
+  .chat-page .composer-dock {
+    bottom: calc(73px + env(safe-area-inset-bottom));
+    left: 20px;
+    right: 20px;
+    width: auto;
+    transform: none;
+    border-radius: var(--r-md);
+  }
+}

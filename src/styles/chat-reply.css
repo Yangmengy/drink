@@ -1,0 +1,32 @@
+/* 一轮回复的正文和酒品推荐共用外层卡片，链路仍放在卡片上方。 */
+.assistant-content {
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.assistant-content > p {
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+.assistant-content > .recommendation-note {
+  line-height: 1.6;
+}
+
+.assistant-content .recommendations {
+  min-width: 0;
+  margin-top: 12px;
+}
+
+.assistant-content .recipe-card,
+.assistant-content .recipe-card-body {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .assistant-content { padding: 12px; }
+}

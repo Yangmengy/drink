@@ -1,4 +1,7 @@
-use crate::{agent::Companion, menu, models::*, settings};
+use crate::{
+    agent::Companion, menu, models::*, settings,
+    streaming::{OptionalChatChannel, StreamSink},
+};
 use std::path::PathBuf;
 use tauri::State;
 
@@ -13,6 +16,15 @@ fn error(e: impl std::fmt::Display) -> String {
 #[tauri::command]
 pub async fn list_ingredients(state: State<'_, AppState>) -> Result<Vec<Ingredient>, String> {
     menu::inventory(&state.companion.pool).await.map_err(error)
+}
+#[tauri::command]
+pub async fn add_ingredient(
+    input: NewIngredientInput,
+    state: State<'_, AppState>,
+) -> Result<AddIngredientResult, String> {
+    menu::add_ingredient(&state.companion.pool, &input)
+        .await
+        .map_err(error)
 }
 #[tauri::command]
 pub async fn set_ingredient_owned(
@@ -74,11 +86,16 @@ pub async fn clear_chat_history(state: State<'_, AppState>) -> Result<(), String
 #[tauri::command]
 pub async fn send_chat_message(
     message: String,
+    on_event: OptionalChatChannel,
     state: State<'_, AppState>,
 ) -> Result<ChatMessage, String> {
     state
         .companion
-        .reply_configured(&state.directory, &message)
+        .reply_configured_streaming(
+            &state.directory,
+            &message,
+            StreamSink::from_channel(on_event.0),
+        )
         .await
         .map_err(error)
 }
@@ -86,11 +103,16 @@ pub async fn send_chat_message(
 #[tauri::command]
 pub async fn recommend_local(
     input: LocalRecommendationInput,
+    on_event: OptionalChatChannel,
     state: State<'_, AppState>,
 ) -> Result<LocalRecommendationResult, String> {
     state
         .companion
-        .recommend_local(&state.directory, &input)
+        .recommend_local_streaming(
+            &state.directory,
+            &input,
+            StreamSink::from_channel(on_event.0),
+        )
         .await
         .map_err(error)
 }

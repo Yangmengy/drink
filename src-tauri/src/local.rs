@@ -4,6 +4,7 @@ use crate::{
     menu,
     models::*,
     settings,
+    streaming::StreamSink,
     trace::Recorder,
 };
 use anyhow::{ensure, Result};
@@ -59,7 +60,17 @@ impl Companion {
         directory: &Path,
         input: &LocalRecommendationInput,
     ) -> Result<LocalRecommendationResult> {
-        let trace = Recorder::start_turn();
+        self.recommend_local_streaming(directory, input, StreamSink::default())
+            .await
+    }
+
+    pub async fn recommend_local_streaming(
+        &self,
+        directory: &Path,
+        input: &LocalRecommendationInput,
+        stream: StreamSink,
+    ) -> Result<LocalRecommendationResult> {
+        let trace = Recorder::start_streaming_turn(stream);
         let result = async {
             trace.push("input.validate", "校验本地查询条件");
             input.validate()?;
