@@ -5,6 +5,7 @@ import { BarPage } from './pages/BarPage';
 import { CustomPage } from './pages/CustomPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ChatProvider } from './components/ChatContext';
+import { BarProvider } from './components/BarContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { themes } from './theme';
 
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
+        <BarProvider>
         <ChatProvider>
           <div className="app-shell">
             <aside className="sidebar">
@@ -61,6 +63,7 @@ export default function App() {
             </main>
           </div>
         </ChatProvider>
+        </BarProvider>
       </ThemeProvider>
     </BrowserRouter>
   );

@@ -12,9 +12,12 @@ macOS 默认目录为 `~/Library/Application Support/cocktail-app/`。设置页�
 | `cocktail-chat.db` | 聊天历史和最近 20 轮模型上下文 | ADK SQLite SessionService |
 | `.model-key` | 模型 API Key，独立明文文件，Unix 权限 0600 | `settings` 模块 |
 | WebView localStorage | 当前主题 | 现有前端主题模块 |
+| 当前窗口内存 | 聊天输入、自创配方草稿、酒柜搜索与筛选 | 前端共享状态 |
 | 旧 `cocktail-memory.db` | 历史文件，当前不读写 | 用户自行保留 |
 
 应用数据库迁移不处理 ADK 会话库。清空聊天会删除实际 ADK session；业务库中的 trace 独立保留最近 100 轮。
+
+切换页面会保留聊天输入和每份自创配方草稿；刷新或关闭应用不会保留这些未保存的内容。自创配方保存成功后才清除对应草稿，保存失败可以继续修改或重试。聊天推荐卡片跟随当前酒柜更新，历史聊天文字保持原样；已删除的自创酒只作为历史配方展示，不再宣称可制作，也不会参与新的召回。
 
 ## 新建数据库
 

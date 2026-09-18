@@ -2,13 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowDown, ArrowUp, MessageCircle, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useChat } from '../components/ChatContext';
+import { useBar } from '../components/BarContext';
 import { RecipeCard } from '../components/RecipeCard';
 
 const suggestions = ['今天想随便聊聊', '用我现有的材料，做一杯不太甜的酒', '有点累，陪我待一会儿'];
 
 export function ChatPage() {
-  const { messages, pending, loading, error, send, clear } = useChat();
-  const [draft, setDraft] = useState('');
+  const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear } = useChat();
+  const bar = useBar();
   const [atBottom, setAtBottom] = useState(true);
   const bottom = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -52,8 +53,8 @@ export function ChatPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || pending) return;
-    if (await send(text)) setDraft('');
+    if (!text || pending || loading || clearing) return;
+    void send(text);
     textarea.current?.focus();
   }
 
@@ -61,7 +62,7 @@ export function ChatPage() {
     <section className="chat-page">
       <header className="page-header">
         <span className="eyebrow">A LITTLE COMPANY</span>
-        <button className="icon-button" aria-label="清空对话" title="清空对话和上下文" disabled={!!pending || !messages.length} onClick={() => { if (window.confirm('清空这段对话？聊天记录和 Agent 上下文都会被清除。')) void clear(); }}>
+        <button className="icon-button" aria-label="清空对话" title="清空对话和上下文" disabled={!!pending || clearing || !messages.length} onClick={() => { if (window.confirm('清空这段对话？聊天记录和 Agent 上下文都会被清除。')) void clear(); }}>
           <Trash2 size={19} />
         </button>
       </header>
@@ -80,7 +81,13 @@ export function ChatPage() {
           <article className={`message ${message.role}`} key={message.id}>
             <span className="message-author">{message.role === 'user' ? '我' : 'Mixology'}</span>
             <p>{message.text}</p>
-            {message.recipes.length > 0 && <div className="recommendations">{message.recipes.map(r => <RecipeCard key={r.id} recipe={r} />)}</div>}
+            {message.recipes.length > 0 && <>
+              <p className="recommendation-note muted">{bar.error || bar.loading ? '当前酒柜尚未同步，暂时显示历史配方。' : '卡片按当前酒柜更新，聊天文字保留当时的建议。'}{bar.error && <button className="text-button" onClick={() => void bar.refresh()}>重新同步</button>}</p>
+              <div className="recommendations">{message.recipes.map(r => {
+                const current = bar.recipes.find(item => item.id === r.id);
+                return <RecipeCard key={r.id} recipe={current ?? r} inventoryStatus={bar.error || bar.loading ? 'historical' : current ? 'current' : 'removed'} />;
+              })}</div>
+            </>}
             {message.traceId && <Link className="trace-link" to={`/settings?trace=${message.traceId}`}>查看本轮链路</Link>}
           </article>
         ))}
@@ -94,7 +101,7 @@ export function ChatPage() {
           </>
         )}
         {loading && <p role="status" className="muted">正在找回上次的对话…</p>}
-        {error && <div className="error" role="alert">{error}<Link to="/settings">检查设置</Link></div>}
+        {error && <div className="error" role="alert"><p>{error}</p>{failed && <><p>未发送成功：{failed}</p><button disabled={!!pending || clearing} onClick={() => void send(failed, draft.trim() === failed)}>重试这条消息</button></>}{/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}</div>}
         <div className="bottom-anchor" ref={bottom} />
       </div>
       {!atBottom && messages.length > 0 && (
@@ -109,9 +116,9 @@ export function ChatPage() {
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
           />
-          <button className="send-button" type="submit" disabled={!draft.trim() || !!pending || loading} aria-label="发送消息"><ArrowUp size={22} /></button>
+          <button className="send-button" type="submit" disabled={!draft.trim() || !!pending || loading || clearing} aria-label="发送消息"><ArrowUp size={22} /></button>
         </form>
-        <p className="composer-note">陪你聊聊，也陪你慢慢挑。配方来自你的酒单。</p>
+        <p className="composer-note">{pending ? '正在等待回复。可以先写下一句，切换页面也会保留。' : 'Enter 发送 · Shift + Enter 换行。配方来自你的酒单。'}</p>
       </div>
     </section>
   );
