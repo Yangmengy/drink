@@ -372,3 +372,58 @@ test('saving a model configuration restores normal chat after local mode', async
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.getByText('我在。我们慢慢聊。')).toBeVisible();
 });
+
+// A visible heading may still sit behind the sticky page header; check geometry.
+test('empty chat stays at the top on narrow screens and failed sends do not bring back the welcome panel', async ({ page }) => {
+  await page.setViewportSize({ width: 350, height: 700 });
+  await page.goto('/');
+  await expect(page.getByLabel('说点什么')).toBeEnabled();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  const welcomeIsBelowHeader = () => page.evaluate(() => {
+    const heading = document.querySelector('.welcome h2')?.getBoundingClientRect();
+    const header = document.querySelector('.page-header')?.getBoundingClientRect();
+    return !!heading && !!header && window.scrollY === 0 && heading.top >= header.bottom && heading.bottom < innerHeight;
+  });
+  await expect.poll(welcomeIsBelowHeader).toBe(true);
+  await page.screenshot({ path: 'test-results/welcome-narrow.png' });
+  await page.evaluate(() => (window as any).__failNextMessage());
+  await page.getByLabel('说点什么').fill('用我现有的材料，做一杯不太甜的酒');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.getByRole('alert')).toContainText('模拟网络失败');
+  await expect(page.locator('.welcome')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重试这条消息' })).toBeInViewport();
+  await page.getByRole('button', { name: '重试这条消息' }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '清空对话' }).click();
+  await expect(page.locator('.welcome h2')).toBeVisible();
+  await expect.poll(welcomeIsBelowHeader).toBe(true);
+  await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.getByRole('heading', { name: '对话链路', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await expect.poll(welcomeIsBelowHeader).toBe(true);
+});
+
+
+test('new replies do not interrupt reading older messages, and return-to-latest still works', async ({ page }) => {
+  await page.setViewportSize({ width: 350, height: 700 });
+  await page.goto('/');
+  for (let n = 0; n < 3; n++) {
+    await page.getByLabel('说点什么').fill(`第 ${n + 1} 条：` + '这是一段正在阅读的消息。'.repeat(30));
+    await page.getByRole('button', { name: '发送消息' }).click();
+    await expect(page.locator('.message.assistant')).toHaveCount(n + 1);
+  }
+  await page.evaluate(() => (window as any).__holdMessage());
+  await page.getByLabel('说点什么').fill('等回复时先看看前面的消息');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.getByText('正在听你说，也在想怎么回答…')).toBeInViewport();
+  await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect(page.getByRole('button', { name: '回到最新' })).toBeVisible();
+  await page.evaluate(() => (window as any).__releaseMessage());
+  await expect(page.getByText('正在听你说，也在想怎么回答…')).toHaveCount(0);
+  await expect(page.locator('.message.assistant')).toHaveCount(4);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.getByRole('button', { name: '回到最新' }).click();
+  await expect(page.locator('.message.assistant').last()).toBeInViewport();
+});

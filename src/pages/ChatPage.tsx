@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowDown, ArrowUp, MessageCircle, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useChat } from '../components/ChatContext';
@@ -13,6 +13,7 @@ export function ChatPage() {
   const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear, pendingMode, configured, setConfigured } = useChat();
   const bar = useBar();
   const [atBottom, setAtBottom] = useState(true);
+  const followLatest = useRef(true);
   const bottom = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const didInitScroll = useRef(false);
@@ -34,22 +35,30 @@ export function ChatPage() {
     const el = bottom.current;
     if (!el) return;
     const shrink = window.matchMedia('(max-width: 720px)').matches ? -175 : -100;
-    const io = new IntersectionObserver(([entry]) => setAtBottom(entry.isIntersecting), { rootMargin: `0px 0px ${shrink}px 0px` });
+    const io = new IntersectionObserver(([entry]) => {
+      followLatest.current = entry.isIntersecting;
+      setAtBottom(entry.isIntersecting);
+    }, { rootMargin: `0px 0px ${shrink}px 0px` });
     io.observe(el);
     return () => io.disconnect();
   }, []);
 
-  // 历史加载完成后直接定位到最新一条
-  useEffect(() => {
+  // 空对话从页首展示；只有确实存在历史消息时才定位到最后一条。
+  useLayoutEffect(() => {
     if (!loading && !didInitScroll.current) {
       didInitScroll.current = true;
-      scrollToLatest('auto');
+      if (messages.length) scrollToLatest('auto');
+      else window.scrollTo({ top: 0, behavior: 'auto' });
+    } else if (!loading && !messages.length && !pending && !failed && !error) {
+      // 清空对话后恢复欢迎页，不能保留上一段对话的滚动位置。
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
-  }, [loading]);
+  }, [loading, messages.length, pending, failed, error]);
 
   // 自己发送消息时总是滚到底；收到回复时，只有停留在底部才跟随，上翻阅读时不打断
   useEffect(() => { if (pending) scrollToLatest(); }, [pending]);
-  useEffect(() => { if (atBottom) scrollToLatest(); }, [messages, error, atBottom]);
+  // 底部可见性和错误变化本身不触发滚动，避免把欢迎页推到固定页头后面。
+  useEffect(() => { if (messages.length && followLatest.current) scrollToLatest(); }, [messages]);
 
   // 输入框随内容自动增高（上限由 CSS max-height 控制）
   useEffect(() => {
@@ -65,8 +74,9 @@ export function ChatPage() {
     e.preventDefault();
     const text = draft.trim();
     if (!text || pending || loading || clearing) return;
+    followLatest.current = true;
     void send(text);
-    textarea.current?.focus();
+    textarea.current?.focus({ preventScroll: true });
   }
 
   return (
@@ -79,13 +89,13 @@ export function ChatPage() {
       </header>
       {configured === false && <div className="notice local-mode" role="status"><strong>本地模式</strong><p>尚未配置 API，暂时无法智能陪聊。酒柜和本地推荐可以正常使用。<Link to="/settings">配置聊天模型</Link></p></div>}
       <div className="conversation" role="log" aria-label="聊天记录" aria-live="polite">
-        {!messages.length && !pending && (
+        {!loading && !messages.length && !pending && !failed && !error && (
           <div className={`welcome ${configured === false ? 'local-welcome' : ''}`}>
             <div className="welcome-icon"><MessageCircle size={28} strokeWidth={1.4} /></div>
             <h2>{configured === false ? '先看看酒柜里有什么？' : '今天过得怎么样？'}</h2>
             <p>{configured === false ? '选好材料与口味条件，就能从本地酒单里找一杯。' : <>想聊什么都可以。想喝一杯时，<br />我们再一起看看酒柜里有什么。</>}</p>
             {configured !== false && <div className="suggestions">
-              {suggestions.map(s => <button key={s} onClick={() => { setDraft(s); textarea.current?.focus(); }}>{s}</button>)}
+              {suggestions.map(s => <button key={s} onClick={() => { setDraft(s); textarea.current?.focus({ preventScroll: true }); }}>{s}</button>)}
             </div>}
           </div>
         )}
