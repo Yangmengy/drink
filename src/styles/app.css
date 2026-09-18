@@ -206,7 +206,7 @@ small { font-size: 12px; color: var(--muted); }
 .suggestions button { padding: 9px 18px; border: 1px solid var(--border); border-radius: var(--r-pill); font-size: 12px; background: var(--surface); color: var(--text); }
 .suggestions button:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
-.message { margin: 22px 0 28px; max-width: 100%; overflow-wrap: anywhere; }
+.message { margin: 22px 0 28px; max-width: 100%; overflow-wrap: anywhere; scroll-margin-top: 96px; }
 .message-author { display: block; color: var(--muted); font-size: 11px; margin-bottom: 7px; letter-spacing: 1px; }
 .message > p { white-space: pre-wrap; line-height: 1.8; }
 .message.user { margin-left: auto; width: fit-content; max-width: 85%; background: var(--soft); border-radius: 18px 18px 4px 18px; padding: 13px 19px; }

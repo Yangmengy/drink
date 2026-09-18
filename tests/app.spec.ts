@@ -16,6 +16,8 @@ test.beforeEach(async ({ page }) => {
     let releaseSave: (() => void) | undefined;
     let holdMessage: Promise<void> | undefined;
     let releaseMessage: (() => void) | undefined;
+    let holdLocal: Promise<void> | undefined;
+    let releaseLocal: (() => void) | undefined;
     let holdInventory: Promise<void> | undefined;
     let releaseInventory: (() => void) | undefined;
     function menu() { return recipes.map(r => { const missing = r.ingredients.filter(i => !i.optional && !ingredients.some(s => s.id === i.id && s.owned)).map(i => i.name); return { ...r, missing, canMake: missing.length === 0 }; }); }
@@ -28,6 +30,8 @@ test.beforeEach(async ({ page }) => {
       __releaseSave: () => { releaseSave?.(); },
       __holdMessage: () => { holdMessage = new Promise(resolve => { releaseMessage = resolve; }); },
       __releaseMessage: () => { releaseMessage?.(); },
+      __holdLocal: () => { holdLocal = new Promise(resolve => { releaseLocal = resolve; }); },
+      __releaseLocal: () => { releaseLocal?.(); },
       __holdInventory: () => { holdInventory = new Promise(resolve => { releaseInventory = resolve; }); },
       __releaseInventory: () => { releaseInventory?.(); },
       __TAURI_INTERNALS__: { invoke: async (command: string, args: Record<string, any> = {}) => {
@@ -51,6 +55,7 @@ test.beforeEach(async ({ page }) => {
           return id;
         }
         if (command === 'recommend_local') {
+          const hold = holdLocal; holdLocal = undefined; await hold;
           if (failLocal) { failLocal = false; throw new Error('模拟本地数据库读取失败'); }
           const { query, availability, afterTraceId } = args.input;
           const found = menu().filter(r => `${r.name} ${r.ingredients.map(i => i.name).join(' ')}`.includes(query.query)
@@ -322,11 +327,13 @@ test('offline menu queries retain strict filters and return real missing-materia
   await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
   await expect(page.locator('.message.assistant').last()).toContainText('保留了全部筛选条件');
   await expect(page.locator('.recommendations')).toHaveCount(0);
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
   await expect(page.getByLabel('偏酸（≥3）', { exact: true })).toBeChecked();
   await page.getByLabel('偏酸（≥3）', { exact: true }).uncheck();
   await page.getByRole('button', { name: '用现有材料推荐', exact: true }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(2);
   await expect(page.locator('.recommendations')).toHaveCount(0);
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
   await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
   await expect(page.getByRole('button', { name: /金汤力/ })).toContainText('缺 2 种：金酒、汤力水');
   await page.setViewportSize({ width: 375, height: 812 });
@@ -427,3 +434,39 @@ test('new replies do not interrupt reading older messages, and return-to-latest 
   await page.getByRole('button', { name: '回到最新' }).click();
   await expect(page.locator('.message.assistant').last()).toBeInViewport();
 });
+
+for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 }]) {
+  test(`local choices collapse into a visible chat turn and reopen with their values at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/bar');
+    await page.evaluate(() => (window as any).__setConfigured(false));
+    await page.getByRole('link', { name: '聊天', exact: true }).click();
+    await page.getByLabel('酒名或原料关键词').fill('金酒');
+    await page.getByLabel('少甜（≤2）', { exact: true }).check();
+    await page.getByLabel('说点什么').fill('这句草稿继续保留');
+    await page.evaluate(() => (window as any).__holdLocal());
+    await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+    await expect(page.locator('.local-options')).not.toHaveAttribute('open');
+    await expect(page.getByText('正在处理本地请求…')).toBeInViewport();
+    await page.evaluate(() => (window as any).__releaseLocal());
+    await expect(page.locator('.message.assistant')).toContainText('找到 1 款');
+    await expect(page.getByLabel('酒名或原料关键词')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => {
+      const request = document.querySelector('.message.user')!.getBoundingClientRect();
+      const reply = document.querySelector('.message.assistant > p')!.getBoundingClientRect();
+      const header = document.querySelector('.page-header')!.getBoundingClientRect();
+      const composer = document.querySelector('.composer-dock')!.getBoundingClientRect();
+      return request.top >= header.bottom && reply.top >= request.bottom && reply.bottom <= composer.top;
+    })).toBe(true);
+    await expect(page.getByLabel('说点什么')).toHaveValue('这句草稿继续保留');
+    await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
+    await expect(page.getByLabel('酒名或原料关键词')).toHaveValue('金酒');
+    await expect(page.getByLabel('少甜（≤2）', { exact: true })).toBeChecked();
+    await page.evaluate(() => (window as any).__failNextLocal());
+    await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+    await expect(page.locator('.local-options')).toHaveAttribute('open', '');
+    await expect(page.getByText(/本地查询未完成：模拟本地数据库读取失败/)).toBeVisible();
+    await expect(page.getByLabel('酒名或原料关键词')).toHaveValue('金酒');
+    await expect(page.locator('.message.assistant')).toHaveCount(1);
+  });
+}

@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useChat } from './ChatContext';
 import type { LocalRecommendationInput } from '../types';
 
-export function LocalRecommendations() {
-  const { recommendLocal, pending, loading, clearing, localError } = useChat();
+export function LocalRecommendations({ onSearch }: { onSearch: (input: LocalRecommendationInput) => void }) {
+  const { pending, loading, clearing, localError } = useChat();
   const [query, setQuery] = useState('');
   const [lessSweet, setLessSweet] = useState(false);
   const [sour, setSour] = useState(false);
   const [light, setLight] = useState(false);
-  const search = (availability: LocalRecommendationInput['availability']) => void recommendLocal({
+  const search = (availability: LocalRecommendationInput['availability']) => onSearch({
     availability,
     query: { query: query.trim(), maxSweet: lessSweet ? 2 : undefined, minSour: sour ? 3 : undefined, maxStrong: light ? 2 : undefined },
   });

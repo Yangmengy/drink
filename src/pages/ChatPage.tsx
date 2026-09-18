@@ -6,11 +6,12 @@ import { useBar } from '../components/BarContext';
 import { RecipeCard } from '../components/RecipeCard';
 import { LocalRecommendations } from '../components/LocalRecommendations';
 import { api, errorTraceId } from '../api/client';
+import type { LocalRecommendationInput } from '../types';
 
 const suggestions = ['今天想随便聊聊', '用我现有的材料，做一杯不太甜的酒', '有点累，陪我待一会儿'];
 
 export function ChatPage() {
-  const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear, pendingMode, configured, setConfigured } = useChat();
+  const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear, pendingMode, configured, setConfigured, recommendLocal, localError } = useChat();
   const bar = useBar();
   const [atBottom, setAtBottom] = useState(true);
   const followLatest = useRef(true);
@@ -19,6 +20,8 @@ export function ChatPage() {
   const didInitScroll = useRef(false);
   const [localOpen, setLocalOpen] = useState(false);
   const localOptions = useRef<HTMLDetailsElement>(null);
+  const latestTurn = useRef<HTMLElement>(null);
+  const awaitingLocalReply = useRef(false);
   const failedTrace = errorTraceId(error);
   useEffect(() => {
     let active = true;
@@ -55,10 +58,34 @@ export function ChatPage() {
     }
   }, [loading, messages.length, pending, failed, error]);
 
-  // 自己发送消息时总是滚到底；收到回复时，只有停留在底部才跟随，上翻阅读时不打断
-  useEffect(() => { if (pending) scrollToLatest(); }, [pending]);
+  // 发送时立即定位，避免滚动动画在回复出现后继续移动视线。
+  useEffect(() => { if (pending) scrollToLatest('auto'); }, [pending]);
   // 底部可见性和错误变化本身不触发滚动，避免把欢迎页推到固定页头后面。
-  useEffect(() => { if (messages.length && followLatest.current) scrollToLatest(); }, [messages]);
+  useEffect(() => {
+    if (!messages.length) return;
+    if (awaitingLocalReply.current) {
+      awaitingLocalReply.current = false;
+      if (followLatest.current) {
+        latestTurn.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+        latestTurn.current?.focus({ preventScroll: true });
+      }
+    } else if (followLatest.current) scrollToLatest('auto');
+  }, [messages]);
+
+  useLayoutEffect(() => {
+    if (localOpen && localError) localOptions.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+  }, [localOpen, localError]);
+
+  async function searchLocal(input: LocalRecommendationInput) {
+    if (pending || loading || clearing) return;
+    awaitingLocalReply.current = true;
+    followLatest.current = true;
+    setLocalOpen(false);
+    if (!await recommendLocal(input)) {
+      awaitingLocalReply.current = false;
+      setLocalOpen(true);
+    }
+  }
 
   // 输入框随内容自动增高（上限由 CSS max-height 控制）
   useEffect(() => {
@@ -99,8 +126,8 @@ export function ChatPage() {
             </div>}
           </div>
         )}
-        {messages.map(message => (
-          <article className={`message ${message.role}`} key={message.id}>
+        {messages.map((message, index) => (
+          <article className={`message ${message.role}`} key={message.id} ref={index === messages.length - 2 ? latestTurn : undefined} tabIndex={-1}>
             <span className="message-author">{message.role === 'user' ? '我' : message.mode === 'local' ? 'Mixology · 本地模式' : 'Mixology'}</span>
             <p>{message.text}</p>
             {message.recipes.length > 0 && <>
@@ -125,8 +152,8 @@ export function ChatPage() {
         {loading && <p role="status" className="muted">正在找回上次的对话…</p>}
         {error && <div className="error" role="alert"><p>{error}</p>{failed && <><p>未发送成功：{failed}</p><button disabled={!!pending || clearing} onClick={() => void send(failed, draft.trim() === failed)}>重试这条消息</button><button onClick={() => { setLocalOpen(true); localOptions.current?.scrollIntoView({ block: 'start' }); }}>使用本地推荐</button></>}{failedTrace && <Link to={`/settings?trace=${failedTrace}`}>查看失败链路</Link>}{/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}</div>}
         <details className="local-options" ref={localOptions} open={localOpen} onToggle={e => setLocalOpen(e.currentTarget.open)}>
-          <summary>本地查酒单 · 无需 API</summary>
-          <LocalRecommendations />
+          <summary>{messages.length ? '调整推荐条件 · 本地酒单' : '本地查酒单 · 无需 API'}</summary>
+          <LocalRecommendations onSearch={input => void searchLocal(input)} />
         </details>
         <div className="bottom-anchor" ref={bottom} />
       </div>
