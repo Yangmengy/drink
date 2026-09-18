@@ -28,7 +28,6 @@ export function ChatPage() {
     api.settings().then(s => { if (active) setConfigured(s.apiKeyConfigured); }).catch(() => { if (active) setConfigured(null); });
     return () => { active = false; };
   }, [setConfigured]);
-  useEffect(() => { if (configured === false) setLocalOpen(true); }, [configured]);
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => bottom.current?.scrollIntoView({ behavior, block: 'end' });
 
@@ -114,6 +113,10 @@ export function ChatPage() {
           <Trash2 size={19} />
         </button>
       </header>
+      <details className="local-options" ref={localOptions} open={localOpen} onToggle={e => setLocalOpen(e.currentTarget.open)}>
+        <summary>调整推荐条件 · 本地酒单</summary>
+        <LocalRecommendations onSearch={input => void searchLocal(input)} />
+      </details>
       {configured === false && <div className="notice local-mode" role="status"><strong>本地模式</strong><p>尚未配置 API，暂时无法智能陪聊。酒柜和本地推荐可以正常使用。<Link to="/settings">配置聊天模型</Link></p></div>}
       <div className="conversation" role="log" aria-label="聊天记录" aria-live="polite">
         {!loading && !messages.length && !pending && !failed && !error && (
@@ -151,10 +154,6 @@ export function ChatPage() {
         )}
         {loading && <p role="status" className="muted">正在找回上次的对话…</p>}
         {error && <div className="error" role="alert"><p>{error}</p>{failed && <><p>未发送成功：{failed}</p><button disabled={!!pending || clearing} onClick={() => void send(failed, draft.trim() === failed)}>重试这条消息</button><button onClick={() => { setLocalOpen(true); localOptions.current?.scrollIntoView({ block: 'start' }); }}>使用本地推荐</button></>}{failedTrace && <Link to={`/settings?trace=${failedTrace}`}>查看失败链路</Link>}{/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}</div>}
-        <details className="local-options" ref={localOptions} open={localOpen} onToggle={e => setLocalOpen(e.currentTarget.open)}>
-          <summary>{messages.length ? '调整推荐条件 · 本地酒单' : '本地查酒单 · 无需 API'}</summary>
-          <LocalRecommendations onSearch={input => void searchLocal(input)} />
-        </details>
         <div className="bottom-anchor" ref={bottom} />
       </div>
       {!atBottom && messages.length > 0 && (

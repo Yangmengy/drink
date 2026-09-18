@@ -305,6 +305,7 @@ test('without an API the chat labels local mode and never pretends to understand
   await page.evaluate(() => (window as any).__setConfigured(false));
   await page.getByRole('link', { name: '聊天', exact: true }).click();
   await expect(page.locator('.local-mode')).toContainText('暂时无法智能陪聊');
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
   await expect(page.getByRole('button', { name: '用现有材料推荐', exact: true })).toBeVisible();
   await page.getByLabel('说点什么').fill('不想喝酒，想聊聊');
   await page.getByRole('button', { name: '发送消息' }).click();
@@ -321,6 +322,7 @@ test('offline menu queries retain strict filters and return real missing-materia
   await page.goto('/bar');
   await page.evaluate(() => (window as any).__setConfigured(false));
   await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
   await page.getByLabel('酒名或原料关键词').fill('金酒');
   await page.getByLabel('少甜（≤2）', { exact: true }).check();
   await page.getByLabel('偏酸（≥3）', { exact: true }).check();
@@ -441,6 +443,13 @@ for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 
     await page.goto('/bar');
     await page.evaluate(() => (window as any).__setConfigured(false));
     await page.getByRole('link', { name: '聊天', exact: true }).click();
+    await expect(page.locator('.local-options')).not.toHaveAttribute('open');
+    await expect.poll(() => page.evaluate(() => {
+      const header = document.querySelector('.page-header')!;
+      const options = document.querySelector('.local-options')!;
+      return header.nextElementSibling === options && options.getBoundingClientRect().top - header.getBoundingClientRect().bottom === 5;
+    })).toBe(true);
+    await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
     await page.getByLabel('酒名或原料关键词').fill('金酒');
     await page.getByLabel('少甜（≤2）', { exact: true }).check();
     await page.getByLabel('说点什么').fill('这句草稿继续保留');

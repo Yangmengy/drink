@@ -486,7 +486,8 @@ small { font-size: 12px; color: var(--muted); }
 .local-mode a { margin-left: 10px; text-decoration: underline; }
 .welcome.local-welcome { margin: 24px auto; }
 .local-welcome .welcome-icon { display: none; }
-.local-options { margin: 24px 0 16px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 16px; background: var(--surface); scroll-margin-top: 100px; }
+.chat-page > .page-header { margin-bottom: 5px; }
+.local-options { margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 16px; background: var(--surface); scroll-margin-top: 100px; }
 .local-options summary { cursor: pointer; color: var(--accent); font-size: 13px; }
 .local-query > p { margin: 12px 0 16px; font-size: 12px; }
 .local-query.form label:not(.check-label) { margin-bottom: 14px; }
