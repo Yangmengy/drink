@@ -6,10 +6,15 @@ use std::{io::Write, path::Path};
 const KEY_FILE: &str = ".model-key";
 
 pub fn read_key(dir: &Path) -> Result<String> {
-    let key =
-        std::fs::read_to_string(dir.join(KEY_FILE)).context("请先在设置中填写模型 API Key")?;
-    ensure!(!key.trim().is_empty(), "请先在设置中填写模型 API Key");
-    Ok(key.trim().to_owned())
+    read_optional_key(dir)?.context("请先在设置中填写模型 API Key")
+}
+
+pub fn read_optional_key(dir: &Path) -> Result<Option<String>> {
+    match std::fs::read_to_string(dir.join(KEY_FILE)) {
+        Ok(key) => Ok((!key.trim().is_empty()).then(|| key.trim().to_owned())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => anyhow::bail!("无法读取本地密钥文件，请检查文件权限或重新保存设置"),
+    }
 }
 
 fn write_key(dir: &Path, key: &str) -> Result<()> {
@@ -70,7 +75,7 @@ pub async fn get(pool: &SqlitePool, dir: &Path) -> Result<Settings> {
         preferences: row.get("preferences"),
         model: row.get("model"),
         base_url: row.get("base_url"),
-        api_key_configured: read_key(dir).is_ok_and(|k| !k.trim().is_empty()),
+        api_key_configured: read_optional_key(dir)?.is_some(),
         data_directory: dir.display().to_string(),
     })
 }

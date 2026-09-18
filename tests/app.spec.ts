@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
     const history: unknown[] = [];
     const traces: unknown[] = [];
     let failNext = false;
+    let failLocal = false;
     let failSave = false;
     let holdSave: Promise<void> | undefined;
     let releaseSave: (() => void) | undefined;
@@ -20,6 +21,8 @@ test.beforeEach(async ({ page }) => {
     function menu() { return recipes.map(r => { const missing = r.ingredients.filter(i => !i.optional && !ingredients.some(s => s.id === i.id && s.owned)).map(i => i.name); return { ...r, missing, canMake: missing.length === 0 }; }); }
     Object.assign(window, {
       __failNextMessage: () => { failNext = true; },
+      __setConfigured: (value: boolean) => { settings.apiKeyConfigured = value; },
+      __failNextLocal: () => { failLocal = true; },
       __failNextSave: () => { failSave = true; },
       __holdSave: () => { holdSave = new Promise(resolve => { releaseSave = resolve; }); },
       __releaseSave: () => { releaseSave?.(); },
@@ -32,7 +35,7 @@ test.beforeEach(async ({ page }) => {
         if (command === 'list_ingredients') return ingredients.map(i => ({ ...i }));
         if (command === 'search_menu') return menu();
         if (command === 'get_settings') return { ...settings };
-        if (command === 'save_settings') { settings = { ...settings, ...args.input, apiKeyConfigured: args.input.apiKey !== '' }; return { ...settings }; }
+        if (command === 'save_settings') { settings = { ...settings, ...args.input, apiKeyConfigured: args.input.apiKey == null ? settings.apiKeyConfigured : args.input.apiKey !== '' }; return { ...settings }; }
         if (command === 'list_agent_traces') return [...traces];
         if (command === 'set_ingredient_owned') { const hold = holdInventory; holdInventory = undefined; await hold; ingredients.find(i => i.id === args.id)!.owned = args.owned; return; }
         if (command === 'clear_chat_history') { history.length = 0; return; }
@@ -47,9 +50,36 @@ test.beforeEach(async ({ page }) => {
           const index = recipes.findIndex(p => p.id === id); if (index < 0) recipes.push(value); else recipes[index] = value;
           return id;
         }
+        if (command === 'recommend_local') {
+          if (failLocal) { failLocal = false; throw new Error('模拟本地数据库读取失败'); }
+          const { query, availability, afterTraceId } = args.input;
+          const found = menu().filter(r => `${r.name} ${r.ingredients.map(i => i.name).join(' ')}`.includes(query.query)
+            && (query.maxSweet == null || r.flavor.sweet <= query.maxSweet)
+            && (query.minSour == null || r.flavor.sour >= query.minSour)
+            && (query.maxStrong == null || r.flavor.strong <= query.maxStrong)
+            && (availability === 'any' || (availability === 'ready' ? r.canMake : r.missing.length === 1)));
+          const id = `local-menu-${history.length}`;
+          const request = '本地查酒单：' + (availability === 'ready' ? '材料齐全' : availability === 'missingOne' ? '只差一种材料' : '按缺料从少到多');
+          const message = { id, role: 'assistant', mode: 'local', text: found.length ? `找到 ${found.length} 款，按明确条件推荐。` : '没有找到同时符合这些条件的配方。我保留了全部筛选条件。', recipes: found.slice(0, 3), traceId: id };
+          history.push({ id: `${id}-user`, role: 'user', text: request, recipes: [] }, message);
+          traces.push({ id, startedAt: 1789600000, durationMs: 10, status: 'local', events: [{ phase: 'fallback.start', elapsedMs: 0, detail: afterTraceId ? `来源失败链路：${afterTraceId}` : '本地查询' }, { phase: 'fallback.query', elapsedMs: 1, detail: JSON.stringify(args.input) }, { phase: 'fallback.result', elapsedMs: 10, detail: JSON.stringify({ recipeIds: message.recipes.map(r => r.id) }) }], error: null });
+          return { request, message };
+        }
         if (command === 'send_chat_message') {
           const hold = holdMessage; holdMessage = undefined; await hold;
-          if (failNext) { failNext = false; throw new Error('模拟网络失败，请重试'); }
+          if (failNext) {
+            failNext = false;
+            const id = '00000000-0000-4000-8000-000000000001';
+            traces.push({ id, startedAt: 1789600000, durationMs: 100, status: 'error', events: [{ phase: 'model.error', elapsedMs: 100, detail: '模拟网络失败' }], error: '模拟网络失败' });
+            throw new Error(`模拟网络失败，请重试（链路 ${id}）`);
+          }
+          if (!settings.apiKeyConfigured) {
+            const id = `local-guidance-${history.length}`;
+            const response = { id, role: 'assistant', mode: 'local', text: '暂时还没有连接聊天模型，无法智能陪聊。请使用下方本地查询。', recipes: [], traceId: id };
+            history.push({ id: `${id}-user`, role: 'user', text: args.message, recipes: [] }, response);
+            traces.push({ id, startedAt: 1789600000, durationMs: 10, status: 'local', events: [{ phase: 'fallback.guidance', elapsedMs: 10, detail: '未配置 API Key' }], error: null });
+            return response;
+          }
           const id = `turn-${history.length}`;
           const response = { id, role: 'assistant', text: '我在。我们慢慢聊。', recipes: args.message.includes('自创') ? menu().filter(r => r.source === 'custom') : args.message.includes('酒') ? menu().slice(0, 1) : [], traceId: id };
           history.push({ id: `${id}-user`, role: 'user', text: args.message, recipes: [] }, response);
@@ -262,4 +292,83 @@ test('a slow save cannot erase newer edits after returning to the editor', async
   await expect(page.getByRole('link', { name: /先保存的版本/ })).toBeVisible();
   await expect(page.getByLabel('酒品名称')).toHaveValue('仍在编辑的新草稿');
   await expect(page).toHaveURL(/\/custom$/);
+});
+
+
+test('without an API the chat labels local mode and never pretends to understand casual text', async ({ page }) => {
+  await page.goto('/bar');
+  await page.evaluate(() => (window as any).__setConfigured(false));
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await expect(page.locator('.local-mode')).toContainText('暂时无法智能陪聊');
+  await expect(page.getByRole('button', { name: '用现有材料推荐', exact: true })).toBeVisible();
+  await page.getByLabel('说点什么').fill('不想喝酒，想聊聊');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.locator('.message.assistant')).toContainText('本地模式');
+  await expect(page.locator('.message.assistant')).toContainText('无法智能陪聊');
+  await expect(page.locator('.recommendations')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('link', { name: '查看本轮链路' }).click();
+  await expect(page.locator('.trace-selected')).toContainText('本地完成');
+  await expect(page.locator('.trace-selected')).toContainText('fallback.guidance');
+});
+
+test('offline menu queries retain strict filters and return real missing-material cards', async ({ page }) => {
+  await page.goto('/bar');
+  await page.evaluate(() => (window as any).__setConfigured(false));
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByLabel('酒名或原料关键词').fill('金酒');
+  await page.getByLabel('少甜（≤2）', { exact: true }).check();
+  await page.getByLabel('偏酸（≥3）', { exact: true }).check();
+  await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+  await expect(page.locator('.message.assistant').last()).toContainText('保留了全部筛选条件');
+  await expect(page.locator('.recommendations')).toHaveCount(0);
+  await expect(page.getByLabel('偏酸（≥3）', { exact: true })).toBeChecked();
+  await page.getByLabel('偏酸（≥3）', { exact: true }).uncheck();
+  await page.getByRole('button', { name: '用现有材料推荐', exact: true }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(2);
+  await expect(page.locator('.recommendations')).toHaveCount(0);
+  await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+  await expect(page.getByRole('button', { name: /金汤力/ })).toContainText('缺 2 种：金酒、汤力水');
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/local-chat-mobile.png', fullPage: true });
+});
+
+test('API failure offers local lookup with its trace and preserves the original message for retry', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => (window as any).__failNextMessage());
+  await page.getByLabel('说点什么').fill('原消息先不要丢');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await page.getByRole('button', { name: '使用本地推荐', exact: true }).click();
+  await expect(page.getByRole('link', { name: '查看失败链路' })).toBeVisible();
+  await page.getByLabel('酒名或原料关键词').fill('金酒');
+  await page.evaluate(() => (window as any).__failNextLocal());
+  await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+  await expect(page.getByText(/本地查询未完成：模拟本地数据库读取失败/)).toBeVisible();
+  await expect(page.getByLabel('酒名或原料关键词')).toHaveValue('金酒');
+  await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
+  await expect(page.getByRole('button', { name: /金汤力/ })).toBeVisible();
+  await expect(page.getByLabel('说点什么')).toHaveValue('原消息先不要丢');
+  await page.getByRole('link', { name: '查看本轮链路' }).click();
+  await expect(page.locator('.trace-selected')).toContainText('00000000-0000-4000-8000-000000000001');
+  await expect(page.locator('.trace-selected')).toContainText('本地完成');
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByRole('button', { name: '重试这条消息' }).click();
+  await expect(page.getByText('我在。我们慢慢聊。')).toBeVisible();
+  await expect(page.locator('.message.user').filter({ hasText: '原消息先不要丢' })).toHaveCount(1);
+});
+
+test('saving a model configuration restores normal chat after local mode', async ({ page }) => {
+  await page.goto('/bar');
+  await page.evaluate(() => (window as any).__setConfigured(false));
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await page.getByRole('link', { name: '配置聊天模型', exact: true }).click();
+  await page.getByLabel('API Key', { exact: false }).fill('test-ui-only-key');
+  await page.getByRole('button', { name: '保存设置', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('已保存');
+  await page.getByRole('link', { name: '聊天', exact: true }).click();
+  await expect(page.locator('.local-mode')).toHaveCount(0);
+  await page.getByLabel('说点什么').fill('今天想聊聊');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.getByText('我在。我们慢慢聊。')).toBeVisible();
 });

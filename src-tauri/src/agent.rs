@@ -27,6 +27,8 @@ const SESSION: &str = "default-chat";
 #[serde(rename_all = "camelCase")]
 pub struct Reply {
     pub reply: String,
+    #[serde(default)]
+    pub mode: ReplyMode,
     #[serde(alias = "recommended_recipe_ids")]
     pub recipe_ids: Vec<String>,
     #[serde(default)]
@@ -41,7 +43,7 @@ struct RecipeQuery {
 pub struct Companion {
     pub pool: SqlitePool,
     pub sessions: Arc<dyn SessionService>,
-    gate: Mutex<()>,
+    pub(crate) gate: Mutex<()>,
 }
 
 fn get_request() -> GetRequest {
@@ -88,6 +90,8 @@ pub fn parse_reply(value: &str, allowed: &HashMap<String, Recipe>) -> Result<(Re
         "模型返回了空白或过长的回复"
     );
     ensure!(reply.recipe_ids.len() <= 3, "模型推荐数量超出限制，请重试");
+    // Mode is assigned by the application, never by the model.
+    reply.mode = ReplyMode::Agent;
     let mut seen = HashSet::new();
     reply.recipe_ids.retain(|id| seen.insert(id.clone()));
     let mut recipes = Vec::new();
@@ -143,6 +147,7 @@ impl Companion {
             }
             if event.author == "user" {
                 history.push(ChatMessage {
+                    mode: ReplyMode::Agent,
                     trace_id: None,
                     id: event.id,
                     role: "user".into(),
@@ -157,7 +162,7 @@ impl Companion {
                         .trim_end_matches("```")
                         .trim(),
                 );
-                let (reply, recipes, trace_id) = match parsed {
+                let (reply, recipes, trace_id, mode) = match parsed {
                     Ok(r) => (
                         r.reply,
                         r.recipe_ids
@@ -166,10 +171,12 @@ impl Companion {
                             .take(3)
                             .collect(),
                         r.trace_id,
+                        r.mode,
                     ),
-                    Err(_) => (raw, vec![], None),
+                    Err(_) => (raw, vec![], None, ReplyMode::Agent),
                 };
                 history.push(ChatMessage {
+                    mode,
                     trace_id,
                     id: event.id,
                     role: "assistant".into(),
@@ -209,35 +216,33 @@ impl Companion {
     pub async fn reply_configured(&self, directory: &Path, message: &str) -> Result<ChatMessage> {
         let trace = Recorder::start_turn();
         trace.push("config.start", "读取本地模型配置与密钥");
-        let configuration = async {
-            let profile = settings::get(&self.pool, directory)
-                .await
-                .context("无法读取本地模型配置")?;
-            let key = settings::read_key(directory)?;
+        let result = async {
+            let key = settings::read_optional_key(directory).map_err(|e| {
+                trace.push("config.error", "密钥文件读取失败；未自动降级"); e
+            })?;
+            let Some(key) = key else {
+                trace.push("config.missing", "未配置 API Key；不发起模型请求");
+                let _guard = self.gate.try_lock()
+                    .map_err(|_| anyhow::anyhow!("正在回复上一条消息，请稍候"))?;
+                trace.push("input.validate", "校验消息长度");
+                validate_message(message)?;
+                trace.push("fallback.start", "原因：未配置 API Key；返回本地模式说明");
+                trace.push("fallback.guidance", "没有解析自由文本，没有查询或推荐酒品");
+                let reply = Reply {
+                    reply: "暂时还没有连接聊天模型，我现在无法理解这句话并自然陪聊。你可以使用下方的本地酒单查询，按已有材料和明确的口味条件找酒；也可以在设置中配置模型后继续聊。".into(),
+                    recipe_ids: vec![], trace_id: None, mode: ReplyMode::Local,
+                };
+                return self.save_reply(message, reply, vec![], &trace).await;
+            };
+            let profile = settings::get(&self.pool, directory).await.context("无法读取本地模型配置")?;
             let model = OpenAIClient::new(OpenAIConfig::compatible(
-                key.clone(),
-                profile.base_url.clone(),
-                profile.model.clone(),
-            ))
-            .map_err(|_| anyhow::anyhow!("模型初始化失败，请检查设置"))?;
-            anyhow::Ok((profile, key, model))
-        }
-        .await;
-        match configuration {
-            Ok((profile, key, model)) => {
-                trace.push("config.ready", "模型配置已就绪，密钥不写入 trace");
-                self.reply_traced(Arc::new(model), &profile, message, trace)
-                    .await
-                    .map_err(|e| anyhow::anyhow!(e.to_string().replace(&key, "[已隐藏密钥]")))
-            }
-            Err(error) => {
-                trace.push(
-                    "config.error",
-                    "本地模型配置不可用，请检查 API 地址、模型名称与密钥",
-                );
-                trace.complete(&self.pool, Err(error)).await
-            }
-        }
+                key.clone(), profile.base_url.clone(), profile.model.clone(),
+            )).map_err(|_| anyhow::anyhow!("模型初始化失败，请检查设置"))?;
+            trace.push("config.ready", "模型配置已就绪，密钥不写入 trace");
+            self.reply_with_trace(Arc::new(model), &profile, message, &trace).await
+                .map_err(|e| anyhow::anyhow!(e.to_string().replace(&key, "[已隐藏密钥]")))
+        }.await;
+        trace.complete(&self.pool, result).await
     }
 
     async fn reply_traced(
@@ -247,20 +252,30 @@ impl Companion {
         message: &str,
         trace: Recorder,
     ) -> Result<ChatMessage> {
+        let result = self.reply_with_trace(model, profile, message, &trace).await;
+        trace.complete(&self.pool, result).await
+    }
+
+    async fn reply_with_trace(
+        &self,
+        model: Arc<dyn Llm>,
+        profile: &Settings,
+        message: &str,
+        trace: &Recorder,
+    ) -> Result<ChatMessage> {
         let model = Arc::new(crate::trace::TracedModel {
             model,
             trace: trace.clone(),
         });
-        let result = async {
+        async {
             trace.push("turn.acquire", "获取会话执行锁");
             let _guard = self
                 .gate
                 .try_lock()
                 .map_err(|_| anyhow::anyhow!("正在回复上一条消息，请稍候"))?;
-            self.reply_inner(model, profile, message, &trace).await
+            self.reply_inner(model, profile, message, trace).await
         }
-        .await;
-        trace.complete(&self.pool, result).await
+        .await
     }
 
     async fn reply_inner(
@@ -271,10 +286,7 @@ impl Companion {
         trace: &crate::trace::Recorder,
     ) -> Result<ChatMessage> {
         trace.push("input.validate", "校验消息长度");
-        ensure!(
-            !message.trim().is_empty() && message.chars().count() <= 4000,
-            "消息需为 1–4000 字"
-        );
+        validate_message(message)?;
         trace.push("context.load", "读取本地会话");
         self.ensure_session().await?;
         let persistent = self.sessions.get(get_request()).await?;
@@ -416,12 +428,23 @@ impl Companion {
                 anyhow::anyhow!("回复超时，请重试")
             })??;
         trace.push("output.validate", "校验回复格式与本轮工具候选 ID");
-        let (mut reply, recipes) = parse_reply(&final_text, &*allowed.lock().await)?;
-        reply.trace_id = Some(trace.id.clone());
+        let (reply, recipes) = parse_reply(&final_text, &*allowed.lock().await)?;
         trace.push(
             "output.accepted",
             format!("校验通过，{} 张菜单卡片", recipes.len()),
         );
+        self.save_reply(message, reply, recipes, trace).await
+    }
+
+    pub(crate) async fn save_reply(
+        &self,
+        message: &str,
+        mut reply: Reply,
+        recipes: Vec<Recipe>,
+        trace: &Recorder,
+    ) -> Result<ChatMessage> {
+        self.ensure_session().await?;
+        reply.trace_id = Some(trace.id.clone());
         // Store only accepted user/assistant messages. Tool chatter is transient, not a second memory store.
         let invocation = uuid::Uuid::new_v4().to_string();
         let mut user_event = Event::new(&invocation);
@@ -437,6 +460,7 @@ impl Companion {
             .await?;
         trace.push("session.saved", "对话已保存");
         Ok(ChatMessage {
+            mode: reply.mode,
             trace_id: Some(trace.id.clone()),
             id: reply_event.id,
             role: "assistant".into(),
@@ -444,4 +468,12 @@ impl Companion {
             recipes,
         })
     }
+}
+
+fn validate_message(message: &str) -> Result<()> {
+    ensure!(
+        !message.trim().is_empty() && message.chars().count() <= 4000,
+        "消息需为 1–4000 字"
+    );
+    Ok(())
 }

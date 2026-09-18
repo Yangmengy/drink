@@ -104,9 +104,42 @@ pub struct SettingsInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
+    #[serde(default)]
+    pub mode: ReplyMode,
     pub trace_id: Option<String>,
     pub id: String,
     pub role: String,
     pub text: String,
     pub recipes: Vec<Recipe>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReplyMode {
+    #[default]
+    Agent,
+    Local,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LocalAvailability {
+    Ready,
+    MissingOne,
+    Any,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalRecommendationInput {
+    pub availability: LocalAvailability,
+    pub query: MenuQuery,
+    pub after_trace_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalRecommendationResult {
+    pub request: String,
+    pub message: ChatMessage,
 }

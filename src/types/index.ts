@@ -10,6 +10,12 @@ export interface IngredientInput { name: string; amount: number; unit: string; o
 export interface RecipeInput { id: string | null; name: string; description: string; method: string; flavor: Flavor; ingredients: IngredientInput[]; steps: string[] }
 export interface Settings { name: string; preferences: string; model: string; baseUrl: string; apiKeyConfigured: boolean; dataDirectory: string }
 export interface SettingsInput { name: string; preferences: string; model: string; baseUrl: string; apiKey: string | null }
-export interface ChatMessage { id: string; role: 'user' | 'assistant'; text: string; recipes: Recipe[]; traceId?: string | null }
+export interface ChatMessage { id: string; role: 'user' | 'assistant'; text: string; recipes: Recipe[]; traceId?: string | null; mode?: 'agent' | 'local' }
+export interface LocalRecommendationInput {
+  availability: 'ready' | 'missingOne' | 'any';
+  query: { query: string; maxSweet?: number; minSour?: number; maxStrong?: number };
+  afterTraceId?: string | null;
+}
+export interface LocalRecommendationResult { request: string; message: ChatMessage }
 export interface TraceEvent { phase: string; elapsedMs: number; detail: string }
 export interface AgentTrace { id: string; startedAt: number; durationMs: number; status: string; events: TraceEvent[]; error: string | null }

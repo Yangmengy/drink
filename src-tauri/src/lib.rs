@@ -1,4 +1,5 @@
 pub mod agent;
+mod local;
 mod commands;
 pub mod db;
 pub mod menu;
@@ -22,6 +23,7 @@ pub fn run() {
             get_chat_history,
             clear_chat_history,
             send_chat_message,
+            recommend_local,
             list_agent_traces
         ])
         .setup(|app| {

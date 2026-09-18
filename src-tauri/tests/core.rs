@@ -412,28 +412,36 @@ async fn ungrounded_recommendations_fail_without_saving_half_a_turn() {
 }
 
 #[tokio::test]
-async fn missing_configuration_has_a_trace_without_creating_chat_history() {
+async fn missing_configuration_returns_explicit_local_guidance_without_model_calls() {
     let pool = database().await;
     let directory = tempfile::tempdir().unwrap();
     let companion = Companion::new(pool.clone(), Arc::new(InMemorySessionService::new()))
         .await
         .unwrap();
-    let error = companion
-        .reply_configured(directory.path(), "你好")
+    let response = companion
+        .reply_configured(directory.path(), "我不想喝酒，今天只想聊聊")
         .await
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(response.mode, ReplyMode::Local);
+    assert!(response.recipes.is_empty());
+    assert!(response.text.contains("无法理解"));
     let traces = trace::list(&pool).await.unwrap();
     assert_eq!(traces.len(), 1);
-    assert_eq!(traces[0].status, "error");
-    assert!(error.to_string().contains(&traces[0].id));
+    assert_eq!(traces[0].status, "local");
+    assert_eq!(response.trace_id.as_deref(), Some(traces[0].id.as_str()));
     assert!(traces[0]
         .events
         .iter()
-        .any(|event| event.phase == "config.error"));
+        .any(|event| event.phase == "config.missing"));
     assert!(!traces[0]
         .events
         .iter()
-        .any(|event| event.phase.starts_with("model.")));
+        .any(|event| event.phase.starts_with("model.") || event.phase.starts_with("tool.")));
+    let history = companion.history().await.unwrap();
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[1].mode, ReplyMode::Local);
+    assert_eq!(history[0].text, "我不想喝酒，今天只想聊聊");
+    companion.clear().await.unwrap();
     assert!(companion.history().await.unwrap().is_empty());
 }
 

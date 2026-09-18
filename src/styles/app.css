@@ -480,3 +480,17 @@ small { font-size: 12px; color: var(--muted); }
 .save-notice { position: fixed; right: 24px; bottom: 24px; z-index: 15; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100vw - 48px)); margin: 0; border: 1px solid var(--accent); box-shadow: 0 8px 28px var(--shadow-color); }
 .save-notice .icon-button { width: 28px; height: 28px; }
 @media (max-width: 720px) { .save-notice { bottom: calc(84px + env(safe-area-inset-bottom)); right: 16px; max-width: calc(100vw - 32px); } }
+
+/* Explicit local recommendations remain usable without a model connection. */
+.local-mode { margin-top: 0; }
+.local-mode a { margin-left: 10px; text-decoration: underline; }
+.welcome.local-welcome { margin: 24px auto; }
+.local-welcome .welcome-icon { display: none; }
+.local-options { margin: 24px 0 16px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 16px; background: var(--surface); scroll-margin-top: 100px; }
+.local-options summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+.local-query > p { margin: 12px 0 16px; font-size: 12px; }
+.local-query.form label:not(.check-label) { margin-bottom: 14px; }
+.local-flavors { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.local-query-note { margin: 10px 0; font-size: 12px; }
+.local-query-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.local-query-actions .button { padding: 9px 14px; font-size: 13px; }

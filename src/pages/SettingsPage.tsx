@@ -66,7 +66,7 @@ export function SettingsPage() {
           <fieldset disabled={busy}>
             <legend className="sr-only">个人偏好和模型设置</legend>
             <h2 className="form-heading">连接聊天模型</h2>
-            <p className="notice">{settings.apiKeyConfigured ? '已保存模型配置，可以回到聊天开始对话。' : '还差一步：填写模型与 API Key，保存后就能开始聊天。'}</p>
+            <p className="notice">{settings.apiKeyConfigured ? '已保存模型配置，可以回到聊天开始对话。' : '未配置模型时可使用本地酒单推荐；填写 API Key 后开启智能陪聊。'}</p>
             <p className="muted helper">使用支持工具调用的兼容 API。聊天和必要的酒单上下文会发送给你选择的模型服务商。</p>
             <label>API 地址<input required type="url" value={settings.baseUrl} onChange={e => { setSaved(false); setSettings({ ...settings, baseUrl: e.target.value }); }} /></label>
             <label>模型名称<input required maxLength={120} value={settings.model} placeholder="例如 qwen-plus" onChange={e => { setSaved(false); setSettings({ ...settings, model: e.target.value }); }} /></label>
@@ -121,7 +121,7 @@ export function SettingsPage() {
         {traces.map(t => (
           <details className={`trace ${traceId === t.id ? 'trace-selected' : ''}`} ref={traceId === t.id ? selectedTrace : undefined} tabIndex={-1} key={t.id} open={traceId === t.id ? true : undefined}>
             <summary>
-              <span className={`trace-status ${t.status === 'ok' ? 'success' : 'danger'}`}>{t.status === 'ok' ? '完成' : '失败'}</span>
+              <span className={`trace-status ${t.status === 'error' ? 'danger' : 'success'}`}>{t.status === 'local' ? '本地完成' : t.status === 'ok' ? '完成' : '失败'}</span>
               <time>{new Date(t.startedAt * 1000).toLocaleString()}</time>
               <span>{(t.durationMs / 1000).toFixed(2)} s</span>
             </summary>

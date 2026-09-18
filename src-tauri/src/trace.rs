@@ -41,7 +41,7 @@ impl Recorder {
         let trace = Self::new();
         trace.push(
             "turn.start",
-            "收到用户消息；由陪伴主 Agent 决定是否使用菜单工具",
+            "收到请求；检查模型配置或执行明确的本地酒单查询",
         );
         trace
     }
@@ -79,9 +79,16 @@ impl Recorder {
             },
         );
         let events = self.events.lock().map(|e| e.clone()).unwrap_or_default();
+        let status = if !ok {
+            "error"
+        } else if events.iter().any(|e| e.phase == "fallback.start") {
+            "local"
+        } else {
+            "ok"
+        };
         let mut tx = pool.begin().await?;
         sqlx::query("INSERT INTO agent_traces (id,started_at,duration_ms,status,events,error) VALUES (?,?,?,?,?,?)")
-            .bind(&self.id).bind(self.started_at).bind(self.start.elapsed().as_millis() as i64).bind(if ok{"ok"}else{"error"})
+            .bind(&self.id).bind(self.started_at).bind(self.start.elapsed().as_millis() as i64).bind(status)
             .bind(serde_json::to_string(&events)?).bind(if ok{None}else{Some("本轮失败，最后一个事件标明中断阶段；原始模型请求和密钥未记录。")}).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM agent_traces WHERE id NOT IN (SELECT id FROM agent_traces ORDER BY started_at DESC, rowid DESC LIMIT 100)").execute(&mut *tx).await?;
         tx.commit().await?;

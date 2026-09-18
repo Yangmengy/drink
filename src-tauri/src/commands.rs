@@ -84,6 +84,18 @@ pub async fn send_chat_message(
 }
 
 #[tauri::command]
+pub async fn recommend_local(
+    input: LocalRecommendationInput,
+    state: State<'_, AppState>,
+) -> Result<LocalRecommendationResult, String> {
+    state
+        .companion
+        .recommend_local(&state.directory, &input)
+        .await
+        .map_err(error)
+}
+
+#[tauri::command]
 pub async fn list_agent_traces(
     state: State<'_, AppState>,
 ) -> Result<Vec<crate::trace::AgentTrace>, String> {
