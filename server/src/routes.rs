@@ -1,7 +1,9 @@
 use crate::{
+    agent,
     auth::{self, login, register, CurrentUser},
     local, menu,
     models::*,
+    settings,
     state::AppState,
 };
 use axum::{
@@ -34,6 +36,10 @@ pub fn api() -> Router<AppState> {
         .route("/recipes", get(search_recipes).post(save_recipe))
         .route("/recipes/{id}", get(get_recipe).delete(delete_recipe))
         .route("/recommendations/local", post(recommend_local))
+        .route("/settings", get(get_settings).put(save_settings))
+        .route("/chat", get(chat_history).delete(clear_chat))
+        .route("/chat/send", post(send_chat))
+        .route("/traces", get(list_traces))
 }
 
 async fn list_ingredients(
@@ -103,4 +109,52 @@ async fn delete_recipe(
 ) -> Result<StatusCode, crate::error::AppError> {
     menu::delete_custom(&state.pool, user.id, &id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_settings(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<Settings>, crate::error::AppError> {
+    Ok(Json(settings::get(&state.pool, user.id).await?))
+}
+
+async fn save_settings(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<SettingsInput>,
+) -> Result<Json<Settings>, crate::error::AppError> {
+    Ok(Json(settings::save(&state.pool, user.id, &input).await?))
+}
+
+async fn chat_history(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<Vec<ChatMessage>>, crate::error::AppError> {
+    Ok(Json(agent::history(&state.pool, user.id).await?))
+}
+
+async fn clear_chat(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<StatusCode, crate::error::AppError> {
+    agent::clear(&state.pool, user.id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn send_chat(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<ChatSendInput>,
+) -> Result<Json<ChatMessage>, crate::error::AppError> {
+    let profile = settings::get(&state.pool, user.id).await?;
+    agent::send(&state.pool, user.id, &profile, &input)
+        .await
+        .map(Json)
+}
+
+async fn list_traces(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<Vec<AgentTrace>>, crate::error::AppError> {
+    Ok(Json(agent::traces(&state.pool, user.id).await?))
 }

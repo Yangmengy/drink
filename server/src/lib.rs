@@ -1,9 +1,11 @@
+pub mod agent;
 pub mod auth;
 pub mod error;
 pub mod local;
 pub mod menu;
 pub mod models;
 pub mod routes;
+pub mod settings;
 pub mod state;
 
 use axum::{http::HeaderName, http::HeaderValue, routing::get, Router};

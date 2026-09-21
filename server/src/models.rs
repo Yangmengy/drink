@@ -142,3 +142,70 @@ pub struct LocalRecommendationResult {
     pub request: String,
     pub message: LocalReplyMessage,
 }
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    pub name: String,
+    pub preferences: String,
+    pub model: String,
+    pub base_url: String,
+    pub api_key_configured: bool,
+    pub data_directory: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsInput {
+    pub name: String,
+    pub preferences: String,
+    pub model: String,
+    pub base_url: String,
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    pub id: String,
+    pub role: String,
+    pub text: String,
+    #[serde(default)]
+    pub recipes: Vec<Recipe>,
+    #[serde(default)]
+    pub trace_id: Option<String>,
+    #[serde(default = "default_agent_mode")]
+    pub mode: String,
+}
+
+fn default_agent_mode() -> String {
+    "agent".to_owned()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceEvent {
+    pub phase: String,
+    pub elapsed_ms: u128,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentTrace {
+    pub id: String,
+    pub started_at: i64,
+    pub duration_ms: i32,
+    pub status: String,
+    pub events: Vec<TraceEvent>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSendInput {
+    pub message: String,
+    #[serde(default)]
+    pub api_key: Option<String>,
+}

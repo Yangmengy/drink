@@ -3,10 +3,19 @@ import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, Recip
 export const isNative = () => '__TAURI_INTERNALS__' in window;
 
 const TOKEN_KEY = 'drink_token';
+const MODEL_KEY = 'drink_model_key';
 export const getToken = () => isNative() ? null : localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string) => { if (!isNative()) localStorage.setItem(TOKEN_KEY, token); };
 export const clearToken = () => { if (!isNative()) localStorage.removeItem(TOKEN_KEY); };
 export const isLoggedIn = () => isNative() || !!getToken();
+export const getModelKey = () => isNative() ? null : localStorage.getItem(MODEL_KEY);
+const setModelKey = (key: string) => {
+  if (!isNative()) {
+    if (key) localStorage.setItem(MODEL_KEY, key);
+    else localStorage.removeItem(MODEL_KEY);
+  }
+};
+export const clearModelKey = () => setModelKey('');
 
 interface AuthUser { id: string; email: string; createdAt: string }
 interface AuthResponse { token: string; tokenType: string; expiresAt: string; user: AuthUser }
@@ -15,12 +24,14 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const response = await fetch(path, { ...init, headers });
+  // The /api prefix keeps HTTP endpoints away from SPA routes such as /settings.
+  const response = await fetch(`/api${path}`, { ...init, headers });
   // 登录和注册的 401 表示账号输入无效，必须把错误留给表单展示；
   // 只有已登录请求的 401 才代表令牌失效。
   const isAuthAttempt = path === '/auth/login' || path === '/auth/register';
   if (response.status === 401 && !isAuthAttempt) {
     clearToken();
+    setModelKey('');
     window.location.href = '/login';
     throw new Error('登录已过期，请重新登录');
   }
@@ -43,20 +54,25 @@ function webOrNative<T>(command: string, webFn: () => Promise<T>, args?: Record<
 }
 
 async function streamCall<T>(command: string, args: Record<string, unknown>, onEvent?: (event: ChatStreamEvent) => void): Promise<T> {
-  if (!isNative()) throw new Error('Web 版暂未开放智能聊天，酒柜和酒单可正常使用。');
+  if (!isNative()) throw new Error('Web Agent 需要服务端聊天接口。');
   const channel = onEvent ? new Channel<ChatStreamEvent>(onEvent) : undefined;
   try { return await call<T>(command, { ...args, onEvent: channel ?? null }); }
   finally { if (channel) channel.onmessage = () => {}; }
 }
 
-const webSettings: Settings = {
-  name: '',
-  preferences: '',
-  model: '',
-  baseUrl: '',
-  apiKeyConfigured: false,
-  dataDirectory: 'Web 版',
-};
+function localChatReply(message: string): Promise<ChatMessage> {
+  const text = message.trim();
+  if (!text || Array.from(text).length > 4000) throw new Error('请输入 1–4000 字的消息');
+  // 服务器约定不保存 Web 密钥；没有浏览器密钥时保持和桌面一致的本地说明。
+  return Promise.resolve({
+    id: `web-local-${crypto.randomUUID()}`,
+    role: 'assistant',
+    text: '暂时还没有连接聊天模型，我现在无法理解这句话并自然陪聊。你可以点开顶部的“调整推荐条件”，按已有材料和明确的口味条件找酒；也可以在设置中配置模型后继续聊。',
+    recipes: [],
+    traceId: null,
+    mode: 'local',
+  });
+}
 
 export const api = {
   ingredients: () => webOrNative<Ingredient[]>('list_ingredients', () => http<Ingredient[]>('/ingredients')),
@@ -68,19 +84,35 @@ export const api = {
   register: (email: string, password: string) => http<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
   login: (email: string, password: string) => http<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   me: () => http<AuthUser>('/auth/me'),
-  settings: () => webOrNative<Settings>('get_settings', () => Promise.resolve(webSettings)),
+  settings: () => webOrNative<Settings>('get_settings', async () => {
+    const settings = await http<Settings>('/settings');
+    return {
+      ...settings,
+      apiKeyConfigured: !!getModelKey() && !!settings.model.trim() && !!settings.baseUrl.trim(),
+      dataDirectory: '浏览器本机；服务器不保存 API Key',
+    };
+  }),
   saveSettings: (input: SettingsInput) => webOrNative<Settings>(
     'save_settings',
-    () => Promise.reject(new Error('Web 版暂未开放模型设置，请先使用桌面版。')),
+    async () => {
+      await http<Settings>('/settings', { method: 'PUT', body: JSON.stringify({ name: input.name, preferences: input.preferences, model: input.model, baseUrl: input.baseUrl }) });
+      if (input.apiKey != null) setModelKey(input.apiKey);
+      return api.settings() as Promise<Settings>;
+    },
     { input },
   ),
-  history: () => webOrNative<ChatMessage[]>('get_chat_history', () => Promise.resolve([])),
-  send: (message: string, onEvent?: (event: ChatStreamEvent) => void) => streamCall<ChatMessage>('send_chat_message', { message }, onEvent),
+  history: () => webOrNative<ChatMessage[]>('get_chat_history', () => http<ChatMessage[]>('/chat')),
+  send: (message: string, onEvent?: (event: ChatStreamEvent) => void) => {
+    if (isNative()) return streamCall<ChatMessage>('send_chat_message', { message }, onEvent);
+    const modelKey = getModelKey();
+    if (!modelKey) return localChatReply(message);
+    return http<ChatMessage>('/chat/send', { method: 'POST', body: JSON.stringify({ message, apiKey: modelKey }) });
+  },
   recommendLocal: (input: LocalRecommendationInput, onEvent?: (event: ChatStreamEvent) => void) => isNative()
     ? streamCall<LocalRecommendationResult>('recommend_local', { input }, onEvent)
     : http<LocalRecommendationResult>('/recommendations/local', { method: 'POST', body: JSON.stringify(input) }),
-  clear: () => webOrNative<void>('clear_chat_history', () => Promise.resolve()),
-  traces: () => webOrNative<AgentTrace[]>('list_agent_traces', () => Promise.resolve([])),
+  clear: () => webOrNative<void>('clear_chat_history', () => http<void>('/chat', { method: 'DELETE' })),
+  traces: () => webOrNative<AgentTrace[]>('list_agent_traces', () => http<AgentTrace[]>('/traces')),
 };
 export const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 export const errorTraceId = (error: string) => error.match(/（链路 ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})）/i)?.[1] ?? null;

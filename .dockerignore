@@ -1,0 +1,6 @@
+**
+!server/Cargo.toml
+!server/Cargo.lock
+!server/src/**
+!server/migrations/**
+!src-tauri/prompts/companion.md

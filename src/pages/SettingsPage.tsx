@@ -82,7 +82,7 @@ export function SettingsPage() {
               {saved && <span className="success" role="status">已保存，下次聊天会使用新设置。</span>}
             </div>
           </fieldset>
-          <p className="data-note">菜单、库存、偏好与聊天保存在这台设备。密钥保存在本地独立文件中。<br /><span>{settings.dataDirectory}</span></p>
+        <p className="data-note">菜单、库存、偏好与聊天按当前账号保存。密钥位置：<span>{settings.dataDirectory}</span></p>
         </form>
       )}
 

@@ -875,6 +875,9 @@ test('web registration signs in and avoids the desktop preview message', async (
   }));
   await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }) }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.goto('/login');
   await page.getByPlaceholder('邮箱').fill('web@example.com');
   await page.getByPlaceholder('密码（至少 8 位）').fill('web-password-123');
@@ -907,10 +910,36 @@ test('web registration mode returns to login without submitting', async ({ page 
   await expect.poll(() => registerCalls).toBe(0);
 });
 
+test('web session token survives a temporary auth status check failure', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'stored-web-token');
+  });
+  await page.route('**/auth/me', route => route.abort('connectionreset'));
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+  await expect(page.getByPlaceholder('邮箱')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('drink_token'))).toBe('stored-web-token');
+
+  await page.unroute('**/auth/me');
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.reload();
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await expect(page.getByText('web@example.com')).toBeVisible();
+});
+
 test('web local recommendation queries the server without any model API', async ({ page }) => {
   await page.addInitScript(() => {
     delete (window as any).__TAURI_INTERNALS__;
     localStorage.setItem('drink_token', 'web-token');
+    localStorage.setItem('drink_model_key', 'browser-held-key');
   });
   await page.route('**/auth/me', route => route.fulfill({
     status: 200,
@@ -919,6 +948,9 @@ test('web local recommendation queries the server without any model API', async 
   }));
   await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }) }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/recommendations/local', async route => {
     const body = route.request().postDataJSON() as { availability: string };
     await expect(() => {
@@ -947,4 +979,151 @@ test('web local recommendation queries the server without any model API', async 
   await expect(page.getByText('Bartender · 本地模式')).toBeVisible();
   await expect(page.getByText(/找到 1 款/)).toBeVisible();
   await expect(page.getByRole('heading', { name: '金汤力', exact: true })).toBeVisible();
+});
+
+test('web chat without a browser key stays local and never calls the server agent', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      name: '',
+      preferences: '',
+      model: 'qwen-plus',
+      baseUrl: 'https://dashscope.example/v1',
+      apiKeyConfigured: false,
+      dataDirectory: '浏览器本机；服务器不保存 API Key',
+    }),
+  }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  let agentCalled = false;
+  await page.route('**/chat/send', async route => {
+    agentCalled = true;
+    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'should not be called' }) });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('.local-mode')).toContainText('尚未配置 API');
+  await page.getByLabel('说点什么').fill('不想喝酒，想聊聊');
+  await page.getByRole('button', { name: '发送消息' }).click();
+
+  await expect(page.locator('.message.assistant')).toContainText('暂时还没有连接聊天模型');
+  await expect(page.locator('.message.assistant')).toContainText('调整推荐条件');
+  await expect(page.locator('.recommendations')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(agentCalled).toBe(false);
+});
+
+test('web agent sends the browser-held model key without saving it on the server', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+    localStorage.setItem('drink_model_key', 'browser-held-key');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://dashscope.example/v1', apiKeyConfigured: false, dataDirectory: '浏览器本机；服务器不保存 API Key' }) }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  let sentKey = '';
+  await page.route('**/chat/send', async route => {
+    const body = route.request().postDataJSON() as { message: string; apiKey?: string };
+    sentKey = body.apiKey ?? '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'web-agent-reply', role: 'assistant', text: '我在。今晚想放松一点吗？', recipes: [],
+        traceId: 'web-agent-trace', mode: 'agent',
+      }),
+    });
+  });
+  await page.goto('/');
+  await expect(page.getByLabel('说点什么')).toBeEnabled();
+  await page.getByLabel('说点什么').fill('今天有点累');
+  await page.getByRole('button', { name: '发送消息' }).click();
+  await expect(page.getByText('我在。今晚想放松一点吗？')).toBeVisible();
+  await expect(page.getByText('Bartender', { exact: true })).toBeVisible();
+  await expect.poll(() => sentKey).toBe('browser-held-key');
+});
+
+test('web settings save model preferences without sending the API key to the server', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+
+  let savedRequestBody: Record<string, unknown> | undefined;
+  await page.route(/\/api\/settings$/, async route => {
+    const request = route.request();
+    if (request.method() === 'PUT') {
+      savedRequestBody = request.postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          name: 'Yang',
+          preferences: '少糖',
+          model: 'qwen-max',
+          baseUrl: 'https://model.example.com/v1',
+          apiKeyConfigured: false,
+          dataDirectory: '浏览器本机；服务器不保存 API Key',
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        name: 'Yang',
+        preferences: '少糖',
+        model: 'qwen-max',
+        baseUrl: 'https://model.example.com/v1',
+        apiKeyConfigured: savedRequestBody != null,
+        dataDirectory: '浏览器本机；服务器不保存 API Key',
+      }),
+    });
+  });
+
+  await page.goto('/settings');
+  await page.getByLabel('API Key', { exact: false }).fill('browser-only-key');
+  await page.getByRole('button', { name: '保存设置' }).click();
+
+  await expect(page.getByRole('status')).toContainText('已保存');
+  await expect(page.getByText('已保存模型配置，可以回到聊天开始对话。')).toBeVisible();
+  await expect(page.getByLabel('API Key', { exact: false })).toHaveValue('');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('drink_model_key'))).toBe('browser-only-key');
+  expect(savedRequestBody).toMatchObject({
+    name: 'Yang',
+    preferences: '少糖',
+    model: 'qwen-max',
+    baseUrl: 'https://model.example.com/v1',
+  });
+  expect(savedRequestBody && 'apiKey' in savedRequestBody).toBe(false);
 });

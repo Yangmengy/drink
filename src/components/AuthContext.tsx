@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { isNative, getToken, clearToken, setToken, api } from '../api/client';
+import { isNative, getToken, clearToken, setToken, clearModelKey, api } from '../api/client';
 
 interface AuthUser {
   id: string;
@@ -45,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoggedIn(true);
       })
       .catch(() => {
-        clearToken();
         setLoggedIn(false);
       })
       .finally(() => setReady(true));
@@ -59,16 +58,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     clearToken();
+    clearModelKey();
     completeAuth(await api.login(email, password));
   };
 
   const register = async (email: string, password: string) => {
     clearToken();
+    clearModelKey();
     completeAuth(await api.register(email, password));
   };
 
   const logout = () => {
     clearToken();
+    clearModelKey();
     setUser(null);
     setLoggedIn(false);
   };

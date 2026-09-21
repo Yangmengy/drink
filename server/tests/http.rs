@@ -189,6 +189,69 @@ async fn auth_inventory_and_custom_recipe_flow() -> anyhow::Result<()> {
         "ready-to-make custom recipe should be recommended"
     );
 
+    let response = request_json(
+        app.clone(),
+        "GET",
+        "/settings",
+        Some(registered_token),
+        None,
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let loaded_settings: Value = parse(response).await?;
+    assert_eq!(loaded_settings["apiKeyConfigured"], false);
+
+    let response = request_json(
+        app.clone(),
+        "PUT",
+        "/settings",
+        Some(registered_token),
+        Some(json!({
+            "name": "Server Test",
+            "preferences": "less sweet",
+            "model": "test-model",
+            "baseUrl": "https://model.example.com/v1",
+            "apiKey": "must-not-be-persisted"
+        })),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let saved_settings: Value = parse(response).await?;
+    assert_eq!(saved_settings["model"], "test-model");
+    assert_eq!(saved_settings["apiKeyConfigured"], false);
+    assert_eq!(
+        saved_settings["dataDirectory"],
+        "浏览器本机；服务器不保存 API Key"
+    );
+
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/chat/send",
+        Some(registered_token),
+        Some(json!({"message": "hello", "apiKey": null})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let missing_key: Value = parse(response).await?;
+    assert!(missing_key["message"]
+        .as_str()
+        .unwrap()
+        .contains("请先在设置中填写 API Key"));
+
+    let response = request_json(app.clone(), "GET", "/chat", Some(registered_token), None).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let chat: Value = parse(response).await?;
+    assert_eq!(chat.as_array().unwrap().len(), 0);
+
+    let response =
+        request_json(app.clone(), "GET", "/traces", Some(registered_token), None).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let traces: Value = parse(response).await?;
+    let traces = traces.as_array().unwrap();
+    assert_eq!(traces.len(), 1);
+    assert_eq!(traces[0]["status"], "error");
+
     let response = request_json(app.clone(), "POST", "/recommendations/local", None, None).await?;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 

@@ -13,10 +13,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/auth': 'http://127.0.0.1:8080',
-      '/ingredients': 'http://127.0.0.1:8080',
-      '/recipes': 'http://127.0.0.1:8080',
-      '/recommendations': 'http://127.0.0.1:8080',
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api/, ''),
+      },
       '/health': 'http://127.0.0.1:8080',
       '/ready': 'http://127.0.0.1:8080',
     },
