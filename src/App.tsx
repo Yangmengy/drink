@@ -65,7 +65,7 @@ function AuthGate() {
       <ChatProvider>
         <div className="app-shell">
           <aside className="sidebar">
-            <NavLink className="wordmark" to="/">mixology<span>一起，慢一点。</span></NavLink>
+            <NavLink className="wordmark" to="/">bartender<span>一起，慢一点。</span></NavLink>
             <nav aria-label="主导航">
               {tabs.map(({ path, label, icon: Icon }) => (
                 <NavLink end={path === '/'} key={path} to={path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

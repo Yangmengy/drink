@@ -19,7 +19,7 @@ pub fn data_directory() -> Result<PathBuf> {
         .context("无法定位本地数据目录")?
         .join("cocktail-app");
     #[cfg(debug_assertions)]
-    let path = std::env::var_os("MIXOLOGY_DATA_DIR")
+    let path = std::env::var_os("BARTENDER_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or(path);
     std::fs::create_dir_all(&path)?;

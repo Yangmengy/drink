@@ -944,7 +944,7 @@ test('web local recommendation queries the server without any model API', async 
   await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
   await page.getByRole('button', { name: '只差一种材料' }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(1);
-  await expect(page.getByText('Mixology · 本地模式')).toBeVisible();
+  await expect(page.getByText('Bartender · 本地模式')).toBeVisible();
   await expect(page.getByText(/找到 1 款/)).toBeVisible();
   await expect(page.getByRole('heading', { name: '金汤力', exact: true })).toBeVisible();
 });

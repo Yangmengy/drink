@@ -152,7 +152,7 @@ export function ChatPage() {
       ref={index === messages.length - 2 ? latestTurn : undefined}
       tabIndex={-1}
     >
-      <span className="message-author">{message.role === 'user' ? '我' : message.mode === 'local' ? 'Mixology · 本地模式' : 'Mixology'}</span>
+      <span className="message-author">{message.role === 'user' ? '我' : message.mode === 'local' ? 'Bartender · 本地模式' : 'Bartender'}</span>
       {message.traceId && <ChatTracePanel traceId={message.traceId} />}
       {message.role === 'assistant' ? (
         <div className="assistant-content">
@@ -213,7 +213,7 @@ export function ChatPage() {
           <>
             <article className="message user"><span className="message-author">我</span><p>{pending}</p></article>
             <article className="message assistant">
-              <span className="message-author">{pendingMode === 'local' ? 'Mixology · 本地模式' : 'Mixology'}</span>
+              <span className="message-author">{pendingMode === 'local' ? 'Bartender · 本地模式' : 'Bartender'}</span>
               {liveReply.traceId && <ChatTracePanel traceId={liveReply.traceId} liveEvents={liveReply.events} />}
               <div className="assistant-content">
                 {liveReply.text ? <p className="streaming-reply">{liveReply.text}</p> : <p className="muted" role="status"><span className="typing" aria-hidden="true"><i /><i /><i /></span>{pendingMode === 'local' ? '正在处理本地请求…' : '正在听你说，也在想怎么回答…'}</p>}

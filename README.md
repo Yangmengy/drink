@@ -1,4 +1,4 @@
-# Mixology · 陪伴式调酒 Agent
+# Bartender · 陪伴式调酒 Agent
 
 个人本地使用的桌面聊天伙伴，当前以 macOS 为验证目标。想聊时陪你聊，需要酒品建议时才通过工具读取酒柜与菜单。推荐同时覆盖内置酒品和你的自创配方，不需要部署云服务器。
 
@@ -84,7 +84,7 @@ Rust 集成测试通过模拟 LLM 和本地 HTTP/SSE 服务驱动真实 ADK 工�
 
 对话模型使用最近 20 轮已接受消息；完整记录留在本地。每轮先在临时 ADK session 执行，只有通过结果校验后才保存对话，失败可重试。清空聊天会删除实际 session；本地 trace 独立保留，最多 100 轮，不包含完整对话、密钥或完整模型请求。
 
-调试版可设置 `MIXOLOGY_DATA_DIR=/absolute/test-directory` 使用隔离目录，发布版忽略此变量。不要将真实用户数据用于自动测试。
+调试版可设置 `BARTENDER_DATA_DIR=/absolute/test-directory` 使用隔离目录，发布版忽略此变量。不要将真实用户数据用于自动测试。
 
 ## Trace
 

@@ -36,7 +36,7 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <h1>Mixology</h1>
+      <h1>Bartender</h1>
       <p>一起，慢一点。</p>
       <form onSubmit={(e: FormEvent) => { e.preventDefault(); submit(); }}>
         <input type="email" placeholder="邮箱" value={email} onChange={e => setEmail(e.target.value)} required />

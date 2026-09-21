@@ -49,5 +49,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("Mixology 启动失败，请检查本地数据库与应用日志");
+        .expect("Bartender 启动失败，请检查本地数据库与应用日志");
 }

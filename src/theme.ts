@@ -14,7 +14,7 @@ export const themes: Theme[] = [
   { id: 'night', name: '夜话', hint: '灯下低语', icon: MoonStar },
 ];
 
-const STORAGE_KEY = 'mixology-theme';
+const STORAGE_KEY = 'bartender-theme';
 
 export function resolveInitialTheme(): string {
   try {
