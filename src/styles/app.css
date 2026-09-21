@@ -119,7 +119,7 @@ small { font-size: 12px; color: var(--muted); }
 }
 
 /* ---------- 应用外壳：桌面侧栏 / 移动底栏 ---------- */
-.app-shell { max-width: 1300px; margin: auto; min-height: 100dvh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+.app-shell { min-height: 100dvh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
 .sidebar {
   position: sticky; top: 0; height: 100dvh;
   padding: 40px 26px 32px;
@@ -195,7 +195,7 @@ small { font-size: 12px; color: var(--muted); }
 
 /* ---------- 聊天页 ---------- */
 .chat-page { max-width: 760px; margin: auto; display: flex; flex-direction: column; min-height: 100dvh; }
-.conversation { flex: 1; padding-bottom: 55px; }
+.conversation { flex: 1; padding-bottom: 65px; }
 .conversation > .message:last-child, .conversation > .error:last-child { margin-bottom: 0; }
 
 .welcome { max-width: 440px; margin: 9vh auto 10vh; text-align: center; }
@@ -231,7 +231,7 @@ small { font-size: 12px; color: var(--muted); }
 
 /* 回到最新：固定在输入框右上方，不占据对话流，也不改变页面底部。 */
 .to-latest {
-  position: fixed; right: max(48px, calc(50% - 496px)); bottom: 55px; z-index: 5;
+  position: fixed; right: max(48px, calc(50% - 496px)); bottom: 65px; z-index: 5;
   display: flex; align-items: center; gap: 6px;
   width: fit-content; margin: 0;
   padding: 8px 15px;
@@ -465,7 +465,7 @@ small { font-size: 12px; color: var(--muted); }
   .chat-page { min-height: calc(100dvh - 68px - env(safe-area-inset-bottom)); }
   .welcome { margin: 6vh auto 8vh; }
   .welcome p { font-size: 14px; }
-  .to-latest { right: 20px; bottom: calc(123px + env(safe-area-inset-bottom)); }
+  .to-latest { right: 20px; bottom: calc(133px + env(safe-area-inset-bottom)); }
   .composer-dock { bottom: calc(68px + env(safe-area-inset-bottom)); border-radius: var(--r-md) var(--r-md) 0 0; }
   .composer-note { font-size: 10px; }
   .inventory-list { gap: 0 18px; }
@@ -531,3 +531,110 @@ small { font-size: 12px; color: var(--muted); }
 .local-query-note { margin: 10px 0; font-size: 12px; }
 .local-query-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .local-query-actions .button { padding: 9px 14px; font-size: 13px; }
+
+/* Login page */
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 12px;
+  padding: 24px;
+}
+.login-page h1 { font-size: 32px; margin: 0; }
+.login-page p { color: var(--text-secondary, #666); margin: 0; }
+.login-page form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(320px, 100%);
+  margin-top: 16px;
+}
+.login-page input {
+  padding: 12px 14px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 10px;
+  font-size: 15px;
+}
+.login-page button {
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.login-page button[type="submit"] {
+  background: var(--accent, #6c5ce7);
+  color: #fff;
+}
+.login-page button[type="button"] {
+  background: transparent;
+  border: 1px solid var(--border, #ddd);
+  color: inherit;
+}
+.login-error {
+  color: #e74c3c;
+  font-size: 13px;
+  margin: 0;
+}
+.auth-loading {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 18px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+.account-avatar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  color: var(--accent);
+  font-weight: 650;
+}
+.account-details {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.account-details strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-details small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.account-card button {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.account-card button:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}

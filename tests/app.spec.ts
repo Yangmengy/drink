@@ -397,7 +397,7 @@ test('desktop and mobile views have no overflow and remain operable', async ({ p
     const box = document.querySelector('.composer-dock')!.getBoundingClientRect();
     const send = document.querySelector('.send-button')!.getBoundingClientRect();
     const bottom = window.matchMedia('(max-width: 720px)').matches ? document.querySelector('.sidebar')!.getBoundingClientRect().top : innerHeight;
-    return box.height === 45 && bottom - box.bottom === 5 && send.width === 28 && send.height === 28;
+    return box.height === 45 && bottom - box.bottom === 10 && send.width === 28 && send.height === 28;
   });
   await expect.poll(composerFits).toBe(true);
   await page.screenshot({ path: 'test-results/chat-desktop.png', fullPage: true });
@@ -496,7 +496,7 @@ test('reply text and compact trace steps arrive before completion and survive na
   await expect.poll(() => page.evaluate(() => {
     const messages = document.querySelectorAll('.message.assistant');
     const gap = document.querySelector('.composer-dock')!.getBoundingClientRect().top - messages[messages.length - 1].getBoundingClientRect().bottom;
-    return Math.abs(gap - 5) < 1;
+    return Math.abs(gap - 10) < 1;
   })).toBe(true);
   await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
 });
@@ -708,6 +708,14 @@ test('API failure offers local lookup with its trace and preserves the original 
   await expect(page.getByLabel('酒名或原料关键词')).toHaveValue('金酒');
   await page.getByRole('button', { name: '按缺料从少到多', exact: true }).click();
   await expect(page.getByRole('button', { name: /金汤力/ })).toBeVisible();
+  await expect(page.locator('.error.archived')).toContainText('模拟网络失败');
+  await expect.poll(() => page.evaluate(() => {
+    const children = Array.from(document.querySelector('.conversation')!.children);
+    const failed = children.findIndex(item => item.classList.contains('error'));
+    const request = children.findIndex(item => item.classList.contains('message') && item.textContent?.includes('金酒'));
+    return failed >= 0 && request > failed;
+  })).toBe(true);
+  await expect(page.getByRole('button', { name: '重试这条消息' })).toBeVisible();
   await expect(page.getByLabel('说点什么')).toHaveValue('原消息先不要丢');
   await page.getByRole('button', { name: '查看本轮链路' }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -836,3 +844,107 @@ for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 
     await expect(page.locator('.message.assistant')).toHaveCount(1);
   });
 }
+
+test('web login keeps invalid credential errors visible instead of reloading', async ({ page }) => {
+  await page.addInitScript(() => { delete (window as any).__TAURI_INTERNALS__; });
+  await page.route('**/auth/login', route => route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'invalid email or password' }),
+  }));
+  await page.goto('/login');
+  await page.getByPlaceholder('邮箱').fill('user@example.com');
+  await page.getByPlaceholder('密码（至少 8 位）').fill('wrong-password');
+  await page.getByRole('button', { name: '登录' }).click();
+  await expect(page.getByRole('alert')).toContainText('邮箱或密码不正确');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+});
+
+test('web registration signs in and avoids the desktop preview message', async ({ page }) => {
+  await page.addInitScript(() => { delete (window as any).__TAURI_INTERNALS__; });
+  await page.route('**/auth/register', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      token: 'web-token',
+      tokenType: 'Bearer',
+      expiresAt: '2026-09-28T00:00:00Z',
+      user: { id: '9d2b', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' },
+    }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.goto('/login');
+  await page.getByPlaceholder('邮箱').fill('web@example.com');
+  await page.getByPlaceholder('密码（至少 8 位）').fill('web-password-123');
+  await page.getByRole('button', { name: '注册新用户', exact: true }).click();
+  await expect(page.getByRole('button', { name: '注册并登录', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '注册并登录', exact: true }).click();
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await expect(page.getByText('当前为界面预览。请运行 npm run tauri:dev，使用本地酒柜和 Agent。')).toHaveCount(0);
+  await expect(page.getByText('本地模式')).toBeVisible();
+  await page.getByRole('link', { name: '设置', exact: true }).click();
+  const account = page.getByRole('main').getByRole('region', { name: '当前账号' });
+  await expect(account).toContainText('web@example.com');
+  await expect(account).toContainText('注册于');
+  await account.getByRole('button', { name: '退出', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('web registration mode returns to login without submitting', async ({ page }) => {
+  await page.addInitScript(() => { delete (window as any).__TAURI_INTERNALS__; });
+  let registerCalls = 0;
+  await page.route('**/auth/register', route => {
+    registerCalls++;
+    return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+  });
+  await page.goto('/login');
+  await page.getByRole('button', { name: '注册新用户', exact: true }).click();
+  await page.getByRole('button', { name: '返回登录', exact: true }).click();
+  await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '注册并登录', exact: true })).toHaveCount(0);
+  await expect.poll(() => registerCalls).toBe(0);
+});
+
+test('web local recommendation queries the server without any model API', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recommendations/local', async route => {
+    const body = route.request().postDataJSON() as { availability: string };
+    await expect(() => {
+      if (!body.availability) throw new Error('availability is required');
+    }).not.toThrow();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        request: '本地查酒单：只差一种材料',
+        message: {
+          id: 'web-local-1',
+          role: 'assistant',
+          text: '本地查酒单：只差一种材料。\n找到 1 款，先列出 1 款：\n金汤力：还缺 金酒',
+          recipes: [{ id: 'gin-tonic', name: '金汤力', nameEn: 'Gin & Tonic', description: '', category: 'Gin', source: 'builtin', image: null, method: '直调', flavor: { sweet: 1, sour: 2, bitter: 2, strong: 2 }, ingredients: [], steps: [], missing: ['金酒'], canMake: false }],
+          traceId: null,
+          mode: 'local',
+        },
+      }),
+    });
+  });
+  await page.goto('/');
+  await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
+  await page.getByRole('button', { name: '只差一种材料' }).click();
+  await expect(page.locator('.message.assistant')).toHaveCount(1);
+  await expect(page.getByText('Mixology · 本地模式')).toBeVisible();
+  await expect(page.getByText(/找到 1 款/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: '金汤力', exact: true })).toBeVisible();
+});

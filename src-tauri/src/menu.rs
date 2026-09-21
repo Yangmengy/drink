@@ -33,9 +33,10 @@ async fn find_or_create_ingredient(
         category: category.to_owned(),
         owned: false,
     };
-    sqlx::query("INSERT INTO ingredients (id,name_zh,category,created_at,updated_at) VALUES (?,?,?,strftime('%s','now'),strftime('%s','now'))")
+    sqlx::query("INSERT INTO ingredients (id,name_zh,name_key,category,created_at,updated_at) VALUES (?,?,?,?,strftime('%s','now'),strftime('%s','now'))")
         .bind(&ingredient.id)
         .bind(&ingredient.name)
+        .bind(&normalized)
         .bind(&ingredient.category)
         .execute(&mut *connection)
         .await?;

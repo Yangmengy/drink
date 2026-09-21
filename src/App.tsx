@@ -6,7 +6,11 @@ import { CustomPage } from './pages/CustomPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ChatProvider } from './components/ChatContext';
 import { BarProvider } from './components/BarContext';
+import { AuthProvider, useAuth } from './components/AuthContext';
+import { AccountCard } from './components/AccountCard';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { LoginPage } from './pages/LoginPage';
+import { isNative } from './api/client';
 import { themes } from './theme';
 
 const tabs = [
@@ -33,38 +37,61 @@ function ThemeCycle() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <BarProvider>
-        <ChatProvider>
-          <div className="app-shell">
-            <aside className="sidebar">
-              <NavLink className="wordmark" to="/">mixology<span>一起，慢一点。</span></NavLink>
-              <nav aria-label="主导航">
-                {tabs.map(({ path, label, icon: Icon }) => (
-                  <NavLink end={path === '/'} key={path} to={path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <Icon size={21} strokeWidth={1.6} />
-                    <span>{label}</span>
-                  </NavLink>
-                ))}
-              </nav>
-              <div className="sidebar-foot">
-                <ThemeCycle />
-                <p className="sidebar-note">一点陪伴<br />一杯刚刚好</p>
-              </div>
-            </aside>
-            <main>
-              <Routes>
-                <Route path="/" element={<ChatPage />} />
-                <Route path="/bar" element={<BarPage />} />
-                <Route path="/custom" element={<CustomPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-          </div>
-        </ChatProvider>
-        </BarProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
     </BrowserRouter>
+  );
+}
+
+function AuthGate() {
+  const { ready, loggedIn } = useAuth();
+  if (!isNative() && !ready) {
+    return <ThemeProvider><div className="auth-loading" aria-live="polite">正在确认登录状态…</div></ThemeProvider>;
+  }
+  if (!isNative() && !loggedIn) {
+    return (
+      <ThemeProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </ThemeProvider>
+    );
+  }
+  return (
+    <ThemeProvider>
+      <BarProvider>
+      <ChatProvider>
+        <div className="app-shell">
+          <aside className="sidebar">
+            <NavLink className="wordmark" to="/">mixology<span>一起，慢一点。</span></NavLink>
+            <nav aria-label="主导航">
+              {tabs.map(({ path, label, icon: Icon }) => (
+                <NavLink end={path === '/'} key={path} to={path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                  <Icon size={21} strokeWidth={1.6} />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
+            </nav>
+            <div className="sidebar-foot">
+              <AccountCard />
+              <ThemeCycle />
+              <p className="sidebar-note">一点陪伴<br />一杯刚刚好</p>
+            </div>
+          </aside>
+          <main>
+            <Routes>
+              <Route path="/" element={<ChatPage />} />
+              <Route path="/bar" element={<BarPage />} />
+              <Route path="/custom" element={<CustomPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </ChatProvider>
+      </BarProvider>
+    </ThemeProvider>
   );
 }

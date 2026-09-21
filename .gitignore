@@ -26,6 +26,7 @@ dist-ssr
 # Tauri
 /src-tauri/target/
 /src-tauri/gen/
+/server/target/
 
 
 # Workbuddy memory
@@ -41,3 +42,7 @@ dist-ssr
 .model-key*
 test-results/
 playwright-report/
+
+# 本地笔记与文档不进仓库
+/project.md
+/docs/

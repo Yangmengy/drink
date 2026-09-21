@@ -8,7 +8,7 @@ import { LocalRecommendations } from '../components/LocalRecommendations';
 import { ChatTracePanel } from '../components/ChatTracePanel';
 import { ClearChatDialog } from '../components/ClearChatDialog';
 import { api, errorTraceId } from '../api/client';
-import type { LocalRecommendationInput } from '../types';
+import type { ChatMessage, LocalRecommendationInput } from '../types';
 import '../styles/chat-composer.css';
 import '../styles/chat-reply.css';
 
@@ -24,6 +24,8 @@ export function ChatPage() {
   const didInitScroll = useRef(false);
   const [localOpen, setLocalOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  // 远端失败后，用户转用本地推荐时记录插入点；本地结果出现后，失败框留在原位。
+  const [failedTurnAnchor, setFailedTurnAnchor] = useState<number | null>(null);
   const chatTop = useRef<HTMLDivElement>(null);
   const localOptions = useRef<HTMLDetailsElement>(null);
   const latestTurn = useRef<HTMLElement>(null);
@@ -34,6 +36,10 @@ export function ChatPage() {
     api.settings().then(s => { if (active) setConfigured(s.apiKeyConfigured); }).catch(() => { if (active) setConfigured(null); });
     return () => { active = false; };
   }, [setConfigured]);
+
+  useEffect(() => {
+    if (!messages.length) setFailedTurnAnchor(null);
+  }, [messages.length]);
 
   const isAtBottom = () => document.documentElement.scrollHeight - window.innerHeight - window.scrollY <= 16;
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
@@ -114,6 +120,7 @@ export function ChatPage() {
 
   async function searchLocal(input: LocalRecommendationInput) {
     if (pending || loading || clearing) return;
+    if (failed && error) setFailedTurnAnchor(messages.length);
     awaitingLocalReply.current = true;
     followLatest.current = true;
     setLocalOpen(false);
@@ -127,10 +134,40 @@ export function ChatPage() {
     e.preventDefault();
     const text = draft.trim();
     if (!text || pending || loading || clearing) return;
+    setFailedTurnAnchor(null);
     followLatest.current = true;
     void send(text);
     textarea.current?.focus({ preventScroll: true });
   }
+
+  const failedAnchor = failed && error && failedTurnAnchor !== null && failedTurnAnchor < messages.length
+    ? failedTurnAnchor
+    : null;
+  const failedInsertAt = failedAnchor ?? messages.length;
+
+  const renderMessage = (message: ChatMessage, index: number) => (
+    <article
+      className={`message ${message.role}`}
+      key={message.id}
+      ref={index === messages.length - 2 ? latestTurn : undefined}
+      tabIndex={-1}
+    >
+      <span className="message-author">{message.role === 'user' ? '我' : message.mode === 'local' ? 'Mixology · 本地模式' : 'Mixology'}</span>
+      {message.traceId && <ChatTracePanel traceId={message.traceId} />}
+      {message.role === 'assistant' ? (
+        <div className="assistant-content">
+          <p>{message.text}</p>
+          {message.recipes.length > 0 && <>
+            <p className="recommendation-note muted">{bar.error || bar.loading ? '当前酒柜尚未同步，暂时显示历史配方。' : '卡片按当前酒柜更新，聊天文字保留当时的建议。'}{bar.error && <button className="text-button" onClick={() => void bar.refresh()}>重新同步</button>}</p>
+            <div className="recommendations">{message.recipes.map(r => {
+              const current = bar.recipes.find(item => item.id === r.id);
+              return <RecipeCard key={r.id} recipe={current ?? r} inventoryStatus={bar.error || bar.loading ? 'historical' : current ? 'current' : 'removed'} />;
+            })}</div>
+          </>}
+        </div>
+      ) : <p>{message.text}</p>}
+    </article>
+  );
 
   return (
     <section className="chat-page">
@@ -158,24 +195,20 @@ export function ChatPage() {
             </div>}
           </div>
         )}
-        {messages.map((message, index) => (
-          <article className={`message ${message.role}`} key={message.id} ref={index === messages.length - 2 ? latestTurn : undefined} tabIndex={-1}>
-            <span className="message-author">{message.role === 'user' ? '我' : message.mode === 'local' ? 'Mixology · 本地模式' : 'Mixology'}</span>
-            {message.traceId && <ChatTracePanel traceId={message.traceId} />}
-            {message.role === 'assistant' ? (
-              <div className="assistant-content">
-                <p>{message.text}</p>
-                {message.recipes.length > 0 && <>
-                  <p className="recommendation-note muted">{bar.error || bar.loading ? '当前酒柜尚未同步，暂时显示历史配方。' : '卡片按当前酒柜更新，聊天文字保留当时的建议。'}{bar.error && <button className="text-button" onClick={() => void bar.refresh()}>重新同步</button>}</p>
-                  <div className="recommendations">{message.recipes.map(r => {
-                    const current = bar.recipes.find(item => item.id === r.id);
-                    return <RecipeCard key={r.id} recipe={current ?? r} inventoryStatus={bar.error || bar.loading ? 'historical' : current ? 'current' : 'removed'} />;
-                  })}</div>
-                </>}
-              </div>
-            ) : <p>{message.text}</p>}
-          </article>
-        ))}
+        {messages.slice(0, failedInsertAt).map(renderMessage)}
+        {failedAnchor !== null && (
+          <div className="error archived" role="note">
+            <p>{error}</p>
+            {failed && <>
+              <p>未发送成功：{failed}</p>
+              <button disabled={!!pending || clearing} onClick={() => { setFailedTurnAnchor(null); void send(failed, draft.trim() === failed); }}>重试这条消息</button>
+              <button onClick={() => { setFailedTurnAnchor(messages.length); setLocalOpen(true); }}>使用本地推荐</button>
+            </>}
+            {failedTrace && <ChatTracePanel traceId={failedTrace} label="查看失败链路" />}
+            {/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}
+          </div>
+        )}
+        {messages.slice(failedInsertAt).map(renderMessage)}
         {pending && (
           <>
             <article className="message user"><span className="message-author">我</span><p>{pending}</p></article>
@@ -189,7 +222,7 @@ export function ChatPage() {
           </>
         )}
         {loading && <p role="status" className="muted">正在找回上次的对话…</p>}
-        {error && <div className="error" role="alert"><p>{error}</p>{failed && <><p>未发送成功：{failed}</p><button disabled={!!pending || clearing} onClick={() => void send(failed, draft.trim() === failed)}>重试这条消息</button><button onClick={() => setLocalOpen(true)}>使用本地推荐</button></>}{failedTrace && <ChatTracePanel traceId={failedTrace} label="查看失败链路" />}{/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}</div>}
+        {failedAnchor === null && error && <div className="error" role="alert"><p>{error}</p>{failed && <><p>未发送成功：{failed}</p><button disabled={!!pending || clearing} onClick={() => { setFailedTurnAnchor(null); void send(failed, draft.trim() === failed); }}>重试这条消息</button><button onClick={() => { setFailedTurnAnchor(messages.length); setLocalOpen(true); }}>使用本地推荐</button></>}{failedTrace && <ChatTracePanel traceId={failedTrace} label="查看失败链路" />}{/配置|密钥|API Key|模型名称|API 地址|401|403/i.test(error) && <Link to="/settings">检查模型设置</Link>}</div>}
       </div>
       {!atBottom && messages.length > 0 && (
         <button className="to-latest" onClick={() => scrollToLatest()}>回到最新<ArrowDown size={14} /></button>

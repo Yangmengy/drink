@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS recipes (
 CREATE TABLE IF NOT EXISTS ingredients (
     id TEXT PRIMARY KEY,
     name_zh TEXT NOT NULL,
+    name_key TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL

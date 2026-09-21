@@ -69,6 +69,30 @@ async fn fresh_database_only_creates_the_personal_core() {
             .unwrap(),
         db::SCHEMA_VERSION
     );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM ingredients WHERE name_key IS NULL OR name_key=''"
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        0
+    );
+    for index in [
+        "uq_user_inventory_ingredient_id",
+        "uq_recipe_ingredients_recipe_ingredient",
+        "uq_recipe_steps_recipe_step_number",
+        "uq_ingredients_name_key",
+    ] {
+        let present: i64 = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?",
+        )
+        .bind(index)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(present, 1, "{index} should exist");
+    }
     assert!(sqlx::query("PRAGMA foreign_key_check")
         .fetch_all(&pool)
         .await
@@ -214,8 +238,149 @@ async fn version_one_upgrade_preserves_settings_traces_and_historical_fts() {
             .fetch_one(&pool)
             .await
             .unwrap(),
-        2
+        3
     );
+}
+
+#[tokio::test]
+async fn version_two_upgrade_normalizes_duplicate_relationship_rows() {
+    let pool = empty().await;
+    sqlx::raw_sql(include_str!("legacy_schema.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!("../data/schema.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!("../data/seed.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "INSERT INTO core_migrations VALUES (1,1),(2,1);
+         INSERT INTO companion_settings (id) VALUES (1);
+         INSERT INTO recipes (id,name_zh,category,source,created_at,updated_at) VALUES
+          ('constraint-drink','约束迁移特调','自创','custom',1,1),
+          ('constraint-exact','去重迁移特调','自创','custom',1,1),
+          ('constraint-alias','别名迁移特调','自创','custom',1,1);
+         INSERT INTO ingredients (id,name_zh,category,created_at,updated_at) VALUES
+          ('a-gin','Legacy GIN','spirit',1,1),
+          ('z-gin',' legacy gin ','mixer',2,2),
+          ('exact-ingredient','Exact Ingredient','other',1,1);
+         INSERT INTO recipe_ingredients
+          (id,recipe_id,ingredient_id,amount,unit,is_optional,display_order,created_at) VALUES
+          ('canonical-link','constraint-drink','a-gin',30,'ml',0,2,1),
+          ('duplicate-link','constraint-drink','z-gin',45,'ml',0,1,1),
+          ('exact-first','constraint-exact','exact-ingredient',10,'ml',0,1,1),
+          ('exact-second','constraint-exact','exact-ingredient',20,'ml',0,2,1),
+          ('alias-canonical','constraint-alias','a-gin',15,'ml',0,1,1),
+          ('alias-duplicate','constraint-alias','z-gin',25,'ml',0,2,1);
+         INSERT INTO recipe_steps (id,recipe_id,step_number,instruction,created_at) VALUES
+          ('old-first','constraint-drink',1,'保留旧行',1),
+          ('new-first','constraint-drink',1,'删除重复行',2),
+          ('second','constraint-drink',2,'第二步',3);
+         INSERT INTO user_inventory (id,ingredient_id,amount,unit,added_at,updated_at) VALUES
+          ('old-stock','a-gin',5,'ml',1,1),
+          ('new-stock','z-gin',9,'ml',2,3);",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    db::initialize(&pool).await.unwrap();
+    db::initialize(&pool).await.unwrap();
+
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT version FROM core_migrations ORDER BY version")
+            .fetch_all(&pool)
+            .await
+            .unwrap(),
+        vec![1, 2, 3]
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT name_key FROM ingredients WHERE id='a-gin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "legacy gin"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ingredients WHERE id='z-gin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
+    let stock: (String, String, f64) = sqlx::query_as(
+        "SELECT ingredient_id,id,amount FROM user_inventory WHERE ingredient_id='a-gin'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stock, ("a-gin".into(), "new-stock".into(), 9.0));
+    let link: (String, String, f64) = sqlx::query_as(
+        "SELECT ingredient_id,id,amount FROM recipe_ingredients WHERE recipe_id='constraint-drink'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(link, ("a-gin".into(), "duplicate-link".into(), 45.0));
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM recipe_ingredients WHERE recipe_id='constraint-alias'"
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        1
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM recipe_ingredients WHERE recipe_id='constraint-exact'"
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        1
+    );
+    let steps: Vec<(i32, String)> = sqlx::query_as(
+        "SELECT step_number,instruction FROM recipe_steps WHERE recipe_id='constraint-drink' ORDER BY step_number",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(steps, vec![(1, "保留旧行".into()), (2, "第二步".into())]);
+    assert!(sqlx::query("PRAGMA foreign_key_check")
+        .fetch_all(&pool)
+        .await
+        .unwrap()
+        .is_empty());
+
+    assert!(sqlx::query(
+        "INSERT INTO user_inventory (id,ingredient_id,added_at,updated_at) VALUES ('duplicate-stock','a-gin',1,1)"
+    )
+    .execute(&pool)
+    .await
+    .is_err());
+    assert!(sqlx::query(
+        "INSERT INTO recipe_ingredients (id,recipe_id,ingredient_id,amount,unit,created_at) VALUES ('duplicate-link-2','constraint-drink','a-gin',1,'ml',1)"
+    )
+    .execute(&pool)
+    .await
+    .is_err());
+    assert!(sqlx::query(
+        "INSERT INTO recipe_steps (id,recipe_id,step_number,instruction,created_at) VALUES ('duplicate-step','constraint-drink',1,'重复步骤',1)"
+    )
+    .execute(&pool)
+    .await
+    .is_err());
+    assert!(sqlx::query(
+        "INSERT INTO ingredients (id,name_zh,name_key,category,created_at,updated_at) VALUES ('duplicate-gin','Another Legacy Gin','legacy gin','spirit',1,1)"
+    )
+    .execute(&pool)
+    .await
+    .is_err());
 }
 
 #[tokio::test]

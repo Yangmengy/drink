@@ -13,7 +13,7 @@ export function LocalRecommendations({ onSearch }: { onSearch: (input: LocalReco
     query: { query: query.trim(), maxSweet: lessSweet ? 2 : undefined, minSour: sour ? 3 : undefined, maxStrong: light ? 2 : undefined },
   });
   return <form className="local-query form" onSubmit={e => { e.preventDefault(); search('ready'); }}>
-    <p className="muted">直接查询这台设备的酒单，最多推荐 3 款。只按下面的条件筛选，不解析聊天文字或个人偏好。</p>
+    <p className="muted">直接查询酒单，最多推荐 3 款。只按下面的条件筛选，不解析聊天文字或个人偏好。</p>
     <fieldset disabled={!!pending || loading || clearing}>
       <legend className="sr-only">本地推荐条件</legend>
       <label>酒名或原料关键词<input value={query} maxLength={200} placeholder="可留空，例如：金酒、柠檬" onChange={e => setQuery(e.target.value)} /></label>
