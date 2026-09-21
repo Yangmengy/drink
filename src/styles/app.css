@@ -527,15 +527,15 @@ small { font-size: 12px; color: var(--muted); }
 /* 宽屏双面板：左侧导航与右侧内容各自成为一块大圆角画布 */
 @media (min-width: 1000px) {
   .app-shell {
-    min-height: calc(100dvh - 40px);
+    height: calc(100dvh - 40px);
+    min-height: 0;
     grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
     gap: 20px;
     padding: 20px;
-    align-items: start;
+    align-items: stretch;
   }
   .sidebar {
-    top: 20px;
-    height: calc(100dvh - 40px);
+    height: 100%;
     padding: 32px 24px 24px;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -543,14 +543,32 @@ small { font-size: 12px; color: var(--muted); }
     box-shadow: 0 14px 38px var(--shadow-color);
   }
   .app-shell > main {
-    min-height: calc(100dvh - 40px);
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0 34px 30px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-shell);
     box-shadow: 0 14px 38px var(--shadow-color);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted) 28%, transparent) transparent;
   }
-  .app-shell > main:has(.chat-page) { padding-bottom: 20px; }
+  .app-shell > main:has(.chat-page) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 20px;
+  }
+  .app-shell > main::-webkit-scrollbar { width: 8px; }
+  .app-shell > main::-webkit-scrollbar-track { background: transparent; }
+  .app-shell > main::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted) 28%, transparent);
+    background-clip: padding-box;
+  }
   .page-header {
     margin: 0 -34px 5px;
     padding: 17px 34px 13px;
@@ -569,7 +587,51 @@ small { font-size: 12px; color: var(--muted); }
     border-radius: 0;
     box-shadow: none;
   }
-  .chat-page { min-height: calc(100dvh - 40px); }
+  .chat-page {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    margin: 0;
+    min-height: 0;
+  }
+  .conversation {
+    z-index: 1;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    contain: paint;
+    padding-right: 4px;
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted) 28%, transparent) transparent;
+  }
+  .conversation::-webkit-scrollbar { width: 8px; }
+  .conversation::-webkit-scrollbar-track { background: transparent; }
+  .conversation::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted) 28%, transparent);
+    background-clip: padding-box;
+  }
+  .to-latest {
+    right: 20px;
+    bottom: 65px;
+  }
+  .chat-page .composer-dock {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    z-index: 10;
+    flex-shrink: 0;
+    width: 100%;
+    transform: none;
+    border-radius: var(--r-lg);
+    border-bottom: 1px solid var(--border);
+  }
 }
 .local-options { margin: 0; border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 16px; background: var(--surface); }
 .local-options summary { cursor: pointer; color: var(--accent); font-size: 13px; }

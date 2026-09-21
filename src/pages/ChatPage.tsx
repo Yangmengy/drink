@@ -20,6 +20,7 @@ export function ChatPage() {
   const [atBottom, setAtBottom] = useState(true);
   const followLatest = useRef(true);
   const lastScrollY = useRef(0);
+  const conversation = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const didInitScroll = useRef(false);
   const [localOpen, setLocalOpen] = useState(false);
@@ -41,14 +42,26 @@ export function ChatPage() {
     if (!messages.length) setFailedTurnAnchor(null);
   }, [messages.length]);
 
-  const isAtBottom = () => document.documentElement.scrollHeight - window.innerHeight - window.scrollY <= 16;
+  const isDesktopChat = () => window.matchMedia('(min-width: 1000px)').matches;
+  const currentScrollY = () => (isDesktopChat() ? conversation.current?.scrollTop ?? 0 : window.scrollY);
+  const isAtBottom = () => {
+    const el = conversation.current;
+    if (isDesktopChat() && el) return el.scrollHeight - el.clientHeight - el.scrollTop <= 16;
+    return document.documentElement.scrollHeight - window.innerHeight - window.scrollY <= 16;
+  };
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
-    lastScrollY.current = window.scrollY;
+    const el = conversation.current;
+    if (isDesktopChat() && el) {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      lastScrollY.current = el.scrollTop;
+    } else {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
+      lastScrollY.current = window.scrollY;
+    }
   };
   const shouldFollowLatest = () => {
     // 滚动位置可能先于 scroll 事件更新；同一帧到达的分片也不能把上翻的用户拉回去。
-    if (window.scrollY < lastScrollY.current - 1 && !isAtBottom()) followLatest.current = false;
+    if (currentScrollY() < lastScrollY.current - 1 && !isAtBottom()) followLatest.current = false;
     return followLatest.current;
   };
 
@@ -68,15 +81,18 @@ export function ChatPage() {
     const measure = () => setAtBottom(isAtBottom());
     const onScroll = () => {
       followLatest.current = isAtBottom();
-      lastScrollY.current = window.scrollY;
+      lastScrollY.current = currentScrollY();
       setAtBottom(followLatest.current);
     };
     measure();
+    conversation.current?.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', measure);
     const observer = new ResizeObserver(measure);
     observer.observe(document.body);
+    if (conversation.current) observer.observe(conversation.current);
     return () => {
+      conversation.current?.removeEventListener('scroll', onScroll);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', measure);
       observer.disconnect();
@@ -88,10 +104,12 @@ export function ChatPage() {
     if (!loading && !didInitScroll.current) {
       didInitScroll.current = true;
       if (messages.length) scrollToLatest('auto');
+      else if (isDesktopChat() && conversation.current) conversation.current.scrollTo({ top: 0, behavior: 'auto' });
       else window.scrollTo({ top: 0, behavior: 'auto' });
     } else if (!loading && !messages.length && !pending && !failed && !error) {
       // 清空对话后恢复欢迎页，不能保留上一段对话的滚动位置。
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      if (isDesktopChat() && conversation.current) conversation.current.scrollTo({ top: 0, behavior: 'auto' });
+      else window.scrollTo({ top: 0, behavior: 'auto' });
     }
   }, [loading, messages.length, pending, failed, error]);
 
@@ -184,7 +202,7 @@ export function ChatPage() {
         </details>
       </div>
       {configured === false && <div className="notice local-mode" role="status"><strong>本地模式</strong><p>尚未配置 API，暂时无法智能陪聊。酒柜和本地推荐可以正常使用。<Link to="/settings">配置聊天模型</Link></p></div>}
-      <div className="conversation" role="log" aria-label="聊天记录" aria-live="polite">
+      <div className="conversation" ref={conversation} role="log" aria-label="聊天记录" aria-live="polite">
         {!loading && !messages.length && !pending && !failed && !error && (
           <div className={`welcome ${configured === false ? 'local-welcome' : ''}`}>
             <div className="welcome-icon"><MessageCircle size={28} strokeWidth={1.4} /></div>

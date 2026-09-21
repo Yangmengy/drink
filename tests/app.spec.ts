@@ -396,8 +396,11 @@ test('desktop and mobile views have no overflow and remain operable', async ({ p
   const composerFits = () => page.evaluate(() => {
     const box = document.querySelector('.composer-dock')!.getBoundingClientRect();
     const send = document.querySelector('.send-button')!.getBoundingClientRect();
-    const bottom = window.matchMedia('(max-width: 720px)').matches ? document.querySelector('.sidebar')!.getBoundingClientRect().top : innerHeight;
-    return box.height === 45 && bottom - box.bottom === 10 && send.width === 28 && send.height === 28;
+    const panel = document.querySelector('.app-shell > main')!;
+    const mobile = window.matchMedia('(max-width: 720px)').matches;
+    const bottom = mobile ? document.querySelector('.sidebar')!.getBoundingClientRect().top : panel.getBoundingClientRect().bottom;
+    const inset = mobile ? 10 : parseFloat(getComputedStyle(panel).borderBottomWidth) + parseFloat(getComputedStyle(panel).paddingBottom);
+    return box.height === 45 && bottom - box.bottom === inset && send.width === 28 && send.height === 28;
   });
   await expect.poll(composerFits).toBe(true);
   await page.screenshot({ path: 'test-results/chat-desktop.png', fullPage: true });
@@ -1126,4 +1129,29 @@ test('web settings save model preferences without sending the API key to the ser
     baseUrl: 'https://model.example.com/v1',
   });
   expect(savedRequestBody && 'apiKey' in savedRequestBody).toBe(false);
+});
+
+test('desktop chat scrolls inside the fixed right panel', async ({ page }) => {
+  await page.goto('/');
+  for (let i = 0; i < 4; i++) {
+    await page.getByLabel('说点什么').fill(`第 ${i + 1} 轮：` + '这是足够长的对话内容，用来验证右侧面板内部滚动。'.repeat(6));
+    await page.getByRole('button', { name: '发送消息' }).click();
+    await expect(page.locator('.message.assistant')).toHaveCount(i + 1);
+  }
+  const readPanel = () => page.evaluate(() => ({
+    main: document.querySelector('.app-shell > main')!.getBoundingClientRect().toJSON(),
+    composer: document.querySelector('.composer-dock')!.getBoundingClientRect().toJSON(),
+    bodyScroll: window.scrollY,
+    conversationScroll: document.querySelector('.conversation')!.scrollTop,
+  }));
+  const scrolledDown = await readPanel();
+  await expect.poll(() => page.evaluate(() => document.querySelector('.conversation')!.scrollTop)).toBeGreaterThan(0);
+
+  await page.evaluate(() => document.querySelector('.conversation')!.scrollTo({ top: 0 }));
+  await expect.poll(() => page.evaluate(() => document.querySelector('.conversation')!.scrollTop)).toBe(0);
+  const scrolledUp = await readPanel();
+  expect(scrolledDown.main).toEqual(scrolledUp.main);
+  expect(scrolledDown.composer).toEqual(scrolledUp.composer);
+  expect(scrolledDown.bodyScroll).toBe(0);
+  expect(scrolledUp.bodyScroll).toBe(0);
 });
