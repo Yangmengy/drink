@@ -524,12 +524,12 @@ small { font-size: 12px; color: var(--muted); }
 .chat-top > .page-header { position: static; margin-bottom: 5px; }
 .chat-page .message { scroll-margin-top: calc(var(--chat-top-height, 130px) + 16px); }
 
-/* 宽屏双面板：左侧导航与右侧内容各自成为一块大圆角画布 */
-@media (min-width: 1000px) {
+/* Web 双面板：721px 以上统一使用左侧导航与右侧内容两块大圆角画布 */
+@media (min-width: 721px) {
   .app-shell {
     height: calc(100dvh - 40px);
     min-height: 0;
-    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+    grid-template-columns: clamp(210px, 27%, 300px) minmax(0, 1fr);
     gap: 20px;
     padding: 20px;
     align-items: stretch;
