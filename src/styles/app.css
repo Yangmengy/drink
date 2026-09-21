@@ -527,7 +527,7 @@ small { font-size: 12px; color: var(--muted); }
 /* Web 双面板：721px 以上统一使用左侧导航与右侧内容两块大圆角画布 */
 @media (min-width: 721px) {
   .app-shell {
-    height: calc(100dvh - 40px);
+    height: 100dvh;
     min-height: 0;
     grid-template-columns: clamp(210px, 27%, 300px) minmax(0, 1fr);
     gap: 20px;
