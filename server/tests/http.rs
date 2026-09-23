@@ -56,7 +56,7 @@ async fn auth_inventory_and_custom_recipe_flow() -> anyhow::Result<()> {
         .await?;
 
     let state = AppState {
-        pool: database,
+        pool: database.clone(),
         jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
         owner_email: Some(email.clone()),
     };
@@ -343,42 +343,45 @@ async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
     )
     .fetch_one(&database)
     .await?;
-    let tool_call = json!({
-        "choices": [{
-            "message": {
-                "role": "assistant",
-                "content": null,
-                "tool_calls": [{
-                    "id": "call-menu",
-                    "type": "function",
-                    "function": {
-                        "name": "search_menu",
-                        "arguments": "{\"query\":\"\"}"
-                    }
-                }]
-            },
-            "finish_reason": "tool_calls"
-        }],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-    });
     let final_reply = json!({
         "reply": "ADK Runner completed the real menu tool loop.",
         "recipeIds": [recipe_id]
     });
+    let tool_call = json!({
+        "choices": [{
+            "delta": {
+                "tool_calls": [{
+                    "index": 0,
+                    "id": "call-menu",
+                    "type": "function",
+                    "function": {
+                        "name": "search_menu",
+                        "arguments": "{\"query\":\"Margarita\"}"
+                    }
+                }]
+            },
+            "finish_reason": "tool_calls"
+        }]
+    });
     let final_call = json!({
         "choices": [{
-            "message": {
-                "role": "assistant",
-                "content": serde_json::to_string(&final_reply)?,
-            },
+            "delta": {"content": serde_json::to_string(&final_reply)?},
             "finish_reason": "stop"
         }],
         "usage": {"prompt_tokens": 22, "completion_tokens": 9, "total_tokens": 31}
     });
+    let stream_body = |chunk: &Value| {
+        format!(
+            "data: {}\n\ndata: [DONE]\n\n",
+            serde_json::to_string(chunk).expect("stream chunk")
+        )
+    };
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
         .respond_with(move |_request: &_| {
-            ResponseTemplate::new(200).set_body_json(tool_call.clone())
+            ResponseTemplate::new(200)
+                .append_header("content-type", "text/event-stream")
+                .set_body_string(stream_body(&tool_call))
         })
         .up_to_n_times(1)
         .mount(&model_server)
@@ -386,25 +389,15 @@ async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
     Mock::given(method("POST"))
         .and(path("/chat/completions"))
         .respond_with(move |_request: &_| {
-            ResponseTemplate::new(200).set_body_json(final_call.clone())
+            ResponseTemplate::new(200)
+                .append_header("content-type", "text/event-stream")
+                .set_body_string(stream_body(&final_call))
         })
         .mount(&model_server)
         .await;
 
-    sqlx::query(
-        r#"
-        INSERT INTO companion_settings (user_id, name, preferences, model, base_url)
-        VALUES ((SELECT id FROM users WHERE email = $1), 'Owner', '', 'test-model', $2)
-        ON CONFLICT (user_id) DO UPDATE SET model = 'test-model', base_url = $2
-        "#,
-    )
-    .bind(&email)
-    .bind(model_server.uri())
-    .execute(&database)
-    .await?;
-
     let state = AppState {
-        pool: database,
+        pool: database.clone(),
         jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
         owner_email: Some(email.clone()),
     };
@@ -421,6 +414,22 @@ async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
     assert_eq!(response.status(), StatusCode::CREATED);
     let registered: Value = parse(response).await?;
     let token = registered["token"].as_str().expect("token");
+    let user_id: uuid::Uuid = registered["user"]["id"]
+        .as_str()
+        .expect("user id")
+        .parse()?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO companion_settings (user_id, name, preferences, model, base_url)
+        VALUES ($1, 'Owner', '', 'test-model', $2)
+        ON CONFLICT (user_id) DO UPDATE SET model = 'test-model', base_url = $2
+        "#,
+    )
+    .bind(user_id)
+    .bind(model_server.uri())
+    .execute(&database)
+    .await?;
 
     let response = request_json(
         app.clone(),

@@ -62,19 +62,27 @@ impl Llm for TracedModel {
             ),
         );
         let started = Instant::now();
-        let mut response = self.model.generate_content(request, stream).await?;
-        while let Some(result) = response.next().await {
+        let response = self.model.generate_content(request, stream).await?;
+        let trace = self.trace.clone();
+        let mut first = true;
+        Ok(Box::pin(response.map(move |result| {
+            if first {
+                trace.push(
+                    "model.first_response",
+                    format!("首响应 {} ms", started.elapsed().as_millis()),
+                );
+                first = false;
+            }
             match &result {
                 Ok(event) => {
-                    if event.partial {
-                        continue;
+                    if !event.partial {
+                        trace.push(
+                            "model.response",
+                            format!("模型响应完成，耗时 {} ms", started.elapsed().as_millis()),
+                        );
                     }
-                    self.trace.push(
-                        "model.response",
-                        format!("模型响应完成，耗时 {} ms", started.elapsed().as_millis()),
-                    );
                     if let Some(usage) = &event.usage_metadata {
-                        self.trace.push(
+                        trace.push(
                             "model.usage",
                             format!(
                                 "输入 {} / 输出 {} / 合计 {} tokens",
@@ -85,14 +93,10 @@ impl Llm for TracedModel {
                         );
                     }
                 }
-                Err(_) => self.trace.push("model.error", "模型响应流中断"),
+                Err(_) => trace.push("model.error", "模型响应流中断"),
             }
-            return Ok(Box::pin(adk_rust::futures::stream::once(
-                async move { result },
-            )));
-        }
-
-        Err(adk_rust::AdkError::model("模型返回了空响应"))
+            result
+        })))
     }
 }
 

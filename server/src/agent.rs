@@ -153,8 +153,10 @@ pub(super) fn parse_json_reply(
 
 fn read_chat_message(row: sqlx::postgres::PgRow) -> Result<ChatMessage, AppError> {
     let recipes: Value = row.try_get("recipes")?;
+    let id: uuid::Uuid = row.try_get("id")?;
+
     Ok(ChatMessage {
-        id: row.try_get("id")?,
+        id: id.to_string(),
         role: row.try_get("role")?,
         text: row.try_get("text")?,
         recipes: serde_json::from_value(recipes).map_err(|_| AppError::internal())?,
@@ -271,7 +273,7 @@ pub(super) async fn save_turn(
     reply: &str,
     recipes: &[Recipe],
 ) -> Result<ChatMessage, AppError> {
-    let recipes = serde_json::to_value(recipes).map_err(|_| AppError::internal())?;
+    let recipes_value = serde_json::to_value(recipes).map_err(|_| AppError::internal())?;
     sqlx::query(
         "INSERT INTO chat_messages (user_id, role, text, recipes, mode) VALUES ($1, 'user', $2, '[]'::jsonb, 'agent')",
     )
@@ -288,16 +290,17 @@ pub(super) async fn save_turn(
     )
     .bind(user_id)
     .bind(reply)
-    .bind(&recipes)
+    .bind(&recipes_value)
     .bind(trace_id)
     .fetch_one(pool)
     .await?;
+    let saved_id: uuid::Uuid = row.try_get("id")?;
 
     Ok(ChatMessage {
-        id: row.try_get("id")?,
+        id: saved_id.to_string(),
         role: "assistant".to_owned(),
         text: reply.to_owned(),
-        recipes: serde_json::from_value(recipes).map_err(|_| AppError::internal())?,
+        recipes: recipes.to_vec(),
         trace_id: Some(trace_id.to_owned()),
         mode: "agent".to_owned(),
     })
