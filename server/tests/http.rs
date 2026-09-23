@@ -8,6 +8,10 @@ use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower::ServiceExt;
+use wiremock::{
+    matchers::{method, path},
+    Mock, MockServer, ResponseTemplate,
+};
 
 const EMAIL_HOST: &str = "@it.example.com";
 
@@ -54,6 +58,7 @@ async fn auth_inventory_and_custom_recipe_flow() -> anyhow::Result<()> {
     let state = AppState {
         pool: database,
         jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
+        owner_email: Some(email.clone()),
     };
     let app = router(state);
 
@@ -252,6 +257,57 @@ async fn auth_inventory_and_custom_recipe_flow() -> anyhow::Result<()> {
     assert_eq!(traces.len(), 1);
     assert_eq!(traces[0]["status"], "error");
 
+    let other_email = format!("{}{}", uuid::Uuid::new_v4().simple(), EMAIL_HOST);
+    let other_credentials = json!({
+        "email": other_email,
+        "password": "a-long-password"
+    });
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/auth/register",
+        None,
+        Some(other_credentials),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let registered: Value = parse(response).await?;
+    let other_token = registered["token"].as_str().expect("other token");
+
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/chat/send",
+        Some(other_token),
+        Some(json!({"message": "hello", "apiKey": null})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let response = request_json(
+        app.clone(),
+        "GET",
+        "/observability/summary",
+        Some(registered_token),
+        None,
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let snapshot: Value = parse(response).await?;
+    assert_eq!(snapshot["source"], "server");
+    assert_eq!(snapshot["database"], "ok");
+    assert_eq!(snapshot["traces"].as_array().unwrap().len(), 2);
+
+    let response = request_json(
+        app.clone(),
+        "GET",
+        "/observability/summary",
+        Some(other_token),
+        None,
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
     let response = request_json(app.clone(), "POST", "/recommendations/local", None, None).await?;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
@@ -263,6 +319,139 @@ async fn auth_inventory_and_custom_recipe_flow() -> anyhow::Result<()> {
         None,
     )
     .await?;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    Ok(())
+}
+
+#[tokio::test]
+async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
+    let Some(database_url) = std::env::var("DATABASE_URL").ok() else {
+        eprintln!("DATABASE_URL is not set; ADK Runner PostgreSQL test skipped");
+        return Ok(());
+    };
+    let database = PgPool::connect(&database_url).await?;
+    sqlx::migrate!("./migrations").run(&database).await?;
+    let email = format!("{}{}", uuid::Uuid::new_v4().simple(), EMAIL_HOST);
+    sqlx::query("DELETE FROM users WHERE email = $1")
+        .bind(&email)
+        .execute(&database)
+        .await?;
+
+    let model_server = MockServer::start().await;
+    let recipe_id: String = sqlx::query_scalar(
+        "SELECT id FROM recipes WHERE name_en = 'Margarita' ORDER BY id LIMIT 1",
+    )
+    .fetch_one(&database)
+    .await?;
+    let tool_call = json!({
+        "choices": [{
+            "message": {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [{
+                    "id": "call-menu",
+                    "type": "function",
+                    "function": {
+                        "name": "search_menu",
+                        "arguments": "{\"query\":\"\"}"
+                    }
+                }]
+            },
+            "finish_reason": "tool_calls"
+        }],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    });
+    let final_reply = json!({
+        "reply": "ADK Runner completed the real menu tool loop.",
+        "recipeIds": [recipe_id]
+    });
+    let final_call = json!({
+        "choices": [{
+            "message": {
+                "role": "assistant",
+                "content": serde_json::to_string(&final_reply)?,
+            },
+            "finish_reason": "stop"
+        }],
+        "usage": {"prompt_tokens": 22, "completion_tokens": 9, "total_tokens": 31}
+    });
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(move |_request: &_| {
+            ResponseTemplate::new(200).set_body_json(tool_call.clone())
+        })
+        .up_to_n_times(1)
+        .mount(&model_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(move |_request: &_| {
+            ResponseTemplate::new(200).set_body_json(final_call.clone())
+        })
+        .mount(&model_server)
+        .await;
+
+    sqlx::query(
+        r#"
+        INSERT INTO companion_settings (user_id, name, preferences, model, base_url)
+        VALUES ((SELECT id FROM users WHERE email = $1), 'Owner', '', 'test-model', $2)
+        ON CONFLICT (user_id) DO UPDATE SET model = 'test-model', base_url = $2
+        "#,
+    )
+    .bind(&email)
+    .bind(model_server.uri())
+    .execute(&database)
+    .await?;
+
+    let state = AppState {
+        pool: database,
+        jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
+        owner_email: Some(email.clone()),
+    };
+    let app = router(state);
+    let credentials = json!({"email": email, "password": "a-long-password"});
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/auth/register",
+        None,
+        Some(credentials),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let registered: Value = parse(response).await?;
+    let token = registered["token"].as_str().expect("token");
+
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/chat/send",
+        Some(token),
+        Some(json!({"message": "recommend a cocktail", "apiKey": "test-key"})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let reply: ChatMessage = parse(response).await?;
+    assert_eq!(reply.mode, "agent");
+    assert!(reply.text.contains("ADK Runner"));
+    assert_eq!(reply.recipes.len(), 1);
+    assert_eq!(reply.recipes[0].id, recipe_id);
+
+    let response = request_json(app.clone(), "GET", "/traces", Some(token), None).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let traces: Vec<Value> = parse(response).await?;
+    let phases = traces[0]["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|event| event["phase"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    assert!(phases.contains(&"model.request"));
+    assert!(phases.contains(&"tool.search_menu.start"));
+    assert!(phases.contains(&"tool.search_menu.complete"));
+    assert!(phases.contains(&"output.accepted"));
+
+    let response = request_json(app, "DELETE", "/chat", Some(token), None).await?;
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
     Ok(())
 }

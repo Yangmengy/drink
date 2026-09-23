@@ -40,6 +40,7 @@ services:
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      OPS_OWNER_EMAIL: ${OPS_OWNER_EMAIL:-}
     # 不映射端口到宿主机，Nginx 通过 Docker 内部网络访问
 
 volumes:

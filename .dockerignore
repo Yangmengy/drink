@@ -3,4 +3,5 @@
 !server/Cargo.lock
 !server/src/**
 !server/migrations/**
+!adk-rust/**
 !src-tauri/prompts/companion.md

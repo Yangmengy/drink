@@ -1,7 +1,8 @@
-FROM rust:1.88-slim AS builder
+FROM rust:1.94-slim AS builder
 # Build from the repository root so the server can include the shared prompt.
 WORKDIR /app/server
 COPY server/Cargo.toml server/Cargo.lock ./
+COPY adk-rust ../adk-rust
 COPY server/src ./src
 COPY server/migrations ./migrations
 COPY src-tauri/prompts/companion.md ../src-tauri/prompts/companion.md

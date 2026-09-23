@@ -1,4 +1,4 @@
-import { BrowserRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter, NavLink, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { MessageCircle, Wine, NotebookPen, Settings } from 'lucide-react';
 import { ChatPage } from './pages/ChatPage';
 import { BarPage } from './pages/BarPage';
@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './components/AuthContext';
 import { AccountCard } from './components/AccountCard';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { LoginPage } from './pages/LoginPage';
+import { ObservabilityPage } from './pages/ObservabilityPage';
 import { isNative } from './api/client';
 import { themes } from './theme';
 
@@ -46,6 +47,10 @@ export default function App() {
 
 function AuthGate() {
   const { ready, loggedIn } = useAuth();
+  const { pathname } = useLocation();
+  if (pathname === '/ops') {
+    return <ThemeProvider><ObservabilityPage /></ThemeProvider>;
+  }
   if (!isNative() && !ready) {
     return <ThemeProvider><div className="auth-loading" aria-live="polite">正在确认登录状态…</div></ThemeProvider>;
   }

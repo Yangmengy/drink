@@ -97,7 +97,7 @@ pub struct RecipeInput {
     pub steps: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuQuery {
     #[serde(default)]

@@ -25,3 +25,12 @@ export type ChatStreamEvent =
   | { type: 'trace'; traceId: string; event: TraceEvent };
 export interface LiveReply { traceId: string | null; text: string; events: TraceEvent[] }
 export interface AgentTrace { id: string; startedAt: number; durationMs: number; status: string; events: TraceEvent[]; error: string | null }
+export interface ObservabilityTotals { traces: number; successful: number; local: number; failed: number; successRate: number; modelCalls: number; toolCalls: number }
+export interface ObservabilityLatency { averageMs: number; p95Ms: number }
+export interface ObservabilityTimelinePoint { bucket: string; total: number; successful: number; local: number; failed: number; averageMs: number }
+export interface ObservabilityPhase { phase: string; total: number; averageMs: number }
+export interface ObservabilitySnapshot {
+  source: 'desktop' | 'server'; generatedAt: number; windowHours: number; retention: number; database: string;
+  totals: ObservabilityTotals; latency: ObservabilityLatency; timeline: ObservabilityTimelinePoint[];
+  phases: ObservabilityPhase[]; traces: AgentTrace[];
+}

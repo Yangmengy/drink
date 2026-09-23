@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "server/**"
+      - "adk-rust/**"
       - "deploy/**"
       - ".github/workflows/server-deploy.yml"
 
@@ -66,7 +67,8 @@ jobs:
             type=sha,prefix=
       - uses: docker/build-push-action@v6
         with:
-          context: server
+          context: .
+          file: server/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

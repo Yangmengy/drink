@@ -1,9 +1,11 @@
 pub mod agent;
+pub mod agent_runner;
 pub mod auth;
 pub mod error;
 pub mod local;
 pub mod menu;
 pub mod models;
+pub mod observability;
 pub mod routes;
 pub mod settings;
 pub mod state;
@@ -46,6 +48,7 @@ pub async fn run() -> anyhow::Result<()> {
     let app = router(AppState {
         pool,
         jwt_secret: config.jwt_secret,
+        owner_email: config.owner_email,
     });
     let address = SocketAddr::new(config.host, config.port);
     tracing::info!("drink server listening on http://{address}");

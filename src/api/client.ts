@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent } from '../types';
+import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot } from '../types';
+import { desktopSnapshot } from '../lib/observability';
 export const isNative = () => '__TAURI_INTERNALS__' in window;
 
 const TOKEN_KEY = 'drink_token';
@@ -113,6 +114,10 @@ export const api = {
     : http<LocalRecommendationResult>('/recommendations/local', { method: 'POST', body: JSON.stringify(input) }),
   clear: () => webOrNative<void>('clear_chat_history', () => http<void>('/chat', { method: 'DELETE' })),
   traces: () => webOrNative<AgentTrace[]>('list_agent_traces', () => http<AgentTrace[]>('/traces')),
+  observability: async (): Promise<ObservabilitySnapshot> => {
+    if (isNative()) return desktopSnapshot(await api.traces());
+    return http<ObservabilitySnapshot>('/observability/summary');
+  },
 };
 export const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 export const errorTraceId = (error: string) => error.match(/（链路 ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})）/i)?.[1] ?? null;

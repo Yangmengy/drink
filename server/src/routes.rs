@@ -1,9 +1,9 @@
 use crate::{
     agent,
-    auth::{self, login, register, CurrentUser},
+    auth::{self, login, register, CurrentUser, OwnerUser},
     local, menu,
     models::*,
-    settings,
+    observability, settings,
     state::AppState,
 };
 use axum::{
@@ -40,6 +40,7 @@ pub fn api() -> Router<AppState> {
         .route("/chat", get(chat_history).delete(clear_chat))
         .route("/chat/send", post(send_chat))
         .route("/traces", get(list_traces))
+        .route("/observability/summary", get(observability_summary))
 }
 
 async fn list_ingredients(
@@ -157,4 +158,11 @@ async fn list_traces(
     user: CurrentUser,
 ) -> Result<Json<Vec<AgentTrace>>, crate::error::AppError> {
     Ok(Json(agent::traces(&state.pool, user.id).await?))
+}
+
+async fn observability_summary(
+    State(state): State<AppState>,
+    _owner: OwnerUser,
+) -> Result<Json<observability::ObservabilitySnapshot>, crate::error::AppError> {
+    Ok(Json(observability::summary(&state.pool).await?))
 }

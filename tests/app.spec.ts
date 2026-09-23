@@ -171,6 +171,38 @@ test('four entry points, inventory and menu availability', async ({ page }) => {
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
 
+test('private ops console renders independently from the main shell', async ({ page }) => {
+  await page.goto('/ops');
+  await expect(page.getByRole('heading', { name: 'Agent Ops' })).toBeVisible();
+  await expect(page.getByText('桌面本机')).toBeVisible();
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+  await expect(page.getByText('还没有链路事件。')).toBeVisible();
+  await expect(page.getByText('没有匹配的 trace。')).toBeVisible();
+  await expect(page.getByText('事件来自 agent_traces')).toBeVisible();
+});
+
+test('web users without owner access see no observability data', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/observability/summary', route => route.fulfill({
+    status: 403,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'Ops access is restricted' }),
+  }));
+
+  await page.goto('/ops');
+  await expect(page.getByRole('heading', { name: '私有控制台不可用' })).toBeVisible();
+  await expect(page.getByText('Ops access is restricted')).toBeVisible();
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+});
+
 test('added ingredients survive navigation and make custom recipes available to local recommendations', async ({ page }) => {
   await page.goto('/bar');
   await page.getByRole('button', { name: '添加原料', exact: true }).click();
@@ -933,6 +965,9 @@ test('web session token survives a temporary auth status check failure', async (
   }));
   await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }) }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.reload();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
   await expect(page.getByText('web@example.com')).toBeVisible();

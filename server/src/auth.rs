@@ -83,6 +83,37 @@ impl FromRequestParts<AppState> for CurrentUser {
     }
 }
 
+#[derive(Debug)]
+pub struct OwnerUser {
+    pub id: Uuid,
+}
+
+impl FromRequestParts<AppState> for OwnerUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let current = CurrentUser::from_request_parts(parts, state).await?;
+        let Some(owner_email) = state.owner_email.as_deref() else {
+            return Err(AppError::forbidden("operations console is not configured"));
+        };
+
+        let row = sqlx::query("SELECT email FROM users WHERE id = $1")
+            .bind(current.id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(AppError::unauthorized)?;
+        let email: String = row.try_get("email").map_err(|_| AppError::internal())?;
+        if !email.eq_ignore_ascii_case(owner_email.trim()) {
+            return Err(AppError::forbidden("operations console is private"));
+        }
+
+        Ok(Self { id: current.id })
+    }
+}
+
 pub async fn register(
     State(state): State<AppState>,
     Json(input): Json<RegisterInput>,

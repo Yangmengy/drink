@@ -6,11 +6,14 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 argon2 = "0.5"
+adk-rust = { path = "../adk-rust/adk-rust", default-features = false, features = ["agents", "openai", "tools", "sessions", "runner"] }
+adk-session = { path = "../adk-rust/adk-session" }
 axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 jsonwebtoken = "9"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+schemars = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "migrate"] }
@@ -24,3 +27,4 @@ uuid = { version = "1", features = ["v4", "serde"] }
 http-body-util = "0.1"
 pretty_assertions = "1"
 tower = "0.5"
+wiremock = "0.6"

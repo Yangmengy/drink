@@ -7,6 +7,7 @@ use sqlx::PgPool;
 pub struct AppState {
     pub pool: PgPool,
     pub jwt_secret: String,
+    pub owner_email: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -16,6 +17,7 @@ pub struct Config {
     pub database_url: String,
     pub database_max_connections: u32,
     pub jwt_secret: String,
+    pub owner_email: Option<String>,
 }
 
 impl Config {
@@ -36,6 +38,10 @@ impl Config {
         if jwt_secret.len() < 32 {
             return Err(anyhow!("JWT_SECRET must be at least 32 characters"));
         }
+        let owner_email = env::var("OPS_OWNER_EMAIL")
+            .ok()
+            .map(|value| value.trim().to_lowercase())
+            .filter(|value| !value.is_empty());
 
         Ok(Self {
             host,
@@ -43,6 +49,7 @@ impl Config {
             database_url,
             database_max_connections,
             jwt_secret,
+            owner_email,
         })
     }
 }

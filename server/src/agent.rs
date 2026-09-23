@@ -1,22 +1,23 @@
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::Value;
 use sqlx::{PgPool, Row};
 
-use crate::{error::AppError, menu, models::*};
+use crate::{error::AppError, models::*};
 
-const MAX_TOOL_ROUNDS: usize = 6;
 const MAX_HISTORY_MESSAGES: usize = 20;
-const MENU_RESULT_LIMIT: usize = 12;
-const COMPANION_PROMPT: &str = include_str!("../../src-tauri/prompts/companion.md");
 
-struct TraceRecorder {
-    id: String,
+#[derive(Clone)]
+pub(super) struct TraceRecorder {
+    pub(super) id: String,
     started_at: Instant,
     timestamp: chrono::DateTime<Utc>,
-    events: Vec<TraceEvent>,
+    events: Arc<Mutex<Vec<TraceEvent>>>,
 }
 
 impl TraceRecorder {
@@ -25,19 +26,21 @@ impl TraceRecorder {
             id: uuid::Uuid::new_v4().to_string(),
             started_at: Instant::now(),
             timestamp: Utc::now(),
-            events: Vec::new(),
+            events: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    fn push(&mut self, phase: &str, detail: impl Into<String>) {
-        self.events.push(TraceEvent {
-            phase: phase.to_owned(),
-            elapsed_ms: self.started_at.elapsed().as_millis(),
-            detail: detail.into(),
-        });
+    pub(super) fn push(&self, phase: &str, detail: impl Into<String>) {
+        if let Ok(mut events) = self.events.lock() {
+            events.push(TraceEvent {
+                phase: phase.to_owned(),
+                elapsed_ms: self.started_at.elapsed().as_millis(),
+                detail: detail.into(),
+            });
+        }
     }
 
-    async fn complete(
+    pub(super) async fn complete(
         self,
         pool: &PgPool,
         user_id: uuid::Uuid,
@@ -45,7 +48,12 @@ impl TraceRecorder {
         error: Option<String>,
     ) -> Result<AgentTrace, AppError> {
         let duration_ms = self.started_at.elapsed().as_millis().min(i32::MAX as u128) as i32;
-        let events = serde_json::to_value(&self.events).map_err(|_| AppError::internal())?;
+        let owned_events = self
+            .events
+            .lock()
+            .map(|events| events.clone())
+            .unwrap_or_default();
+        let events = serde_json::to_value(&owned_events).map_err(|_| AppError::internal())?;
         sqlx::query(
             r#"
             INSERT INTO agent_traces
@@ -82,7 +90,7 @@ impl TraceRecorder {
             started_at: self.timestamp.timestamp(),
             duration_ms,
             status: status.to_owned(),
-            events: self.events,
+            events: owned_events,
             error,
         })
     }
@@ -95,7 +103,7 @@ fn validate_message(message: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-fn parse_json_reply(
+pub(super) fn parse_json_reply(
     raw: &str,
     candidates: &HashMap<String, Recipe>,
 ) -> Result<(String, Vec<Recipe>), AppError> {
@@ -141,51 +149,6 @@ fn parse_json_reply(
         );
     }
     Ok((reply.to_owned(), recipes))
-}
-
-fn compact_recipe(recipe: &Recipe) -> Result<Value, AppError> {
-    let mut value = serde_json::to_value(recipe).map_err(|_| AppError::internal())?;
-    if let Some(object) = value.as_object_mut() {
-        object.remove("steps");
-        object.remove("image");
-        object.insert("stepsOmitted".to_owned(), Value::Bool(true));
-    }
-    Ok(value)
-}
-
-fn tool_schemas() -> Vec<Value> {
-    vec![
-        json!({
-            "type": "function",
-            "function": {
-                "name": "search_menu",
-                "description": "Search the user's real cocktail menu and inventory. Returns at most 12 recipes with missing ingredients.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Short cocktail or ingredient keyword; use an empty string for broad search."},
-                        "maxSweet": {"type": "integer", "minimum": 0, "maximum": 5},
-                        "minSour": {"type": "integer", "minimum": 0, "maximum": 5},
-                        "maxStrong": {"type": "integer", "minimum": 0, "maximum": 5}
-                    },
-                    "additionalProperties": false
-                }
-            }
-        }),
-        json!({
-            "type": "function",
-            "function": {
-                "name": "get_recipe",
-                "description": "Get one complete real recipe by ID from this turn's search results.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"id": {"type": "string"}},
-                    "required": ["id"],
-                    "additionalProperties": false
-                }
-            }
-        }),
-    ]
 }
 
 fn read_chat_message(row: sqlx::postgres::PgRow) -> Result<ChatMessage, AppError> {
@@ -266,58 +229,41 @@ pub async fn traces(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<AgentTrace
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|row| {
-        let events: Value = row.try_get("events")?;
-        Ok(AgentTrace {
-            id: row.try_get("id")?,
-            started_at: row
-                .try_get::<chrono::DateTime<Utc>, _>("started_at")?
-                .timestamp(),
-            duration_ms: row.try_get::<i32, _>("duration_ms")?,
-            status: row.try_get("status")?,
-            events: serde_json::from_value(events).map_err(|_| AppError::internal())?,
-            error: row.try_get("error")?,
-        })
-    })
+    .map(read_trace)
     .collect()
 }
 
-async fn call_model(base_url: &str, api_key: &str, payload: &Value) -> Result<Value, AppError> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(75))
-        .build()
-        .map_err(|_| AppError::bad_request("模型客户端初始化失败"))?;
-    let endpoint = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .json(payload)
-        .send()
-        .await
-        .map_err(|_| AppError::bad_request("无法连接模型服务，请检查 API 地址和网络"))?;
-    let status = response.status();
-    let body: Value = response
-        .json()
-        .await
-        .map_err(|_| AppError::bad_request("模型服务返回了无效响应"))?;
-    if !status.is_success() {
-        let detail = body
-            .pointer("/error/message")
-            .and_then(Value::as_str)
-            .unwrap_or("请稍后重试");
-        return Err(match status.as_u16() {
-            401 | 403 => AppError::bad_request(format!("模型密钥无效或没有权限：{detail}")),
-            429 => AppError::bad_request(format!("模型调用频率或额度受限：{detail}")),
-            _ => AppError::bad_request(format!("模型服务返回错误：{detail}")),
-        });
-    }
-
-    body.pointer("/choices/0/message")
-        .cloned()
-        .ok_or_else(|| AppError::bad_request("模型服务没有返回消息"))
+pub async fn all_traces(pool: &PgPool) -> Result<Vec<AgentTrace>, AppError> {
+    sqlx::query(
+        r#"
+        SELECT id, started_at, duration_ms, status, events, error
+        FROM agent_traces
+        ORDER BY started_at DESC, created_at DESC
+        LIMIT 100
+        "#,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(read_trace)
+    .collect()
 }
 
-async fn save_turn(
+fn read_trace(row: sqlx::postgres::PgRow) -> Result<AgentTrace, AppError> {
+    let events: Value = row.try_get("events")?;
+    Ok(AgentTrace {
+        id: row.try_get("id")?,
+        started_at: row
+            .try_get::<chrono::DateTime<Utc>, _>("started_at")?
+            .timestamp(),
+        duration_ms: row.try_get::<i32, _>("duration_ms")?,
+        status: row.try_get("status")?,
+        events: serde_json::from_value(events).map_err(|_| AppError::internal())?,
+        error: row.try_get("error")?,
+    })
+}
+
+pub(super) async fn save_turn(
     pool: &PgPool,
     user_id: uuid::Uuid,
     message: &str,
@@ -363,11 +309,11 @@ pub async fn send(
     settings: &Settings,
     input: &ChatSendInput,
 ) -> Result<ChatMessage, AppError> {
-    let mut trace = TraceRecorder::start();
+    let trace = TraceRecorder::start();
     let trace_id = trace.id.clone();
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(90),
-        send_inner(pool, user_id, settings, input, &mut trace),
+        send_inner(pool, user_id, settings, input, &trace),
     )
     .await
     .unwrap_or_else(|_| Err(AppError::bad_request("模型调用整体超时，请稍后重试")));
@@ -395,7 +341,7 @@ async fn send_inner(
     user_id: uuid::Uuid,
     settings: &Settings,
     input: &ChatSendInput,
-    trace: &mut TraceRecorder,
+    trace: &TraceRecorder,
 ) -> Result<ChatMessage, AppError> {
     trace.push("input.validate", "校验消息长度");
     validate_message(&input.message)?;
@@ -408,129 +354,16 @@ async fn send_inner(
             trace.push("config.missing", "请求未携带 API Key；不调用模型");
             AppError::bad_request("请先在设置中填写 API Key")
         })?;
-    trace.push("config.ready", "模型配置已就绪；密钥不写入链路");
     trace.push("context.load", "读取最近对话");
     let history = load_history(pool, user_id).await?;
-
-    let mut messages = vec![json!({
-        "role": "system",
-        "content": COMPANION_PROMPT,
-    })];
-    for message in history {
-        messages.push(json!({
-            "role": message.role,
-            "content": message.text,
-        }));
-    }
-    messages.push(json!({
-        "role": "user",
-        "content": input.message.trim(),
-    }));
-
-    let mut candidates: HashMap<String, Recipe> = HashMap::new();
-    for round in 0..MAX_TOOL_ROUNDS {
-        let payload = json!({
-            "model": settings.model,
-            "messages": messages,
-            "tools": tool_schemas(),
-            "tool_choice": "auto",
-        });
-        trace.push("model.request", format!("第 {} 轮模型调用", round + 1));
-        let assistant = call_model(&settings.base_url, api_key, &payload).await?;
-        let tool_calls = assistant
-            .get("tool_calls")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-
-        if tool_calls.is_empty() {
-            let raw = assistant
-                .get("content")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            let (reply, recipes) = parse_json_reply(raw, &candidates)?;
-            trace.push(
-                "reply.validate",
-                format!("通过校验，推荐 {} 款", recipes.len()),
-            );
-            return save_turn(pool, user_id, &input.message, &trace.id, &reply, &recipes).await;
-        }
-
-        messages.push(assistant);
-        for call in tool_calls {
-            let id = call
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-            let name = call
-                .pointer("/function/name")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-            let arguments = call
-                .pointer("/function/arguments")
-                .and_then(Value::as_str)
-                .unwrap_or("{}");
-            let arguments: Value = serde_json::from_str(arguments)
-                .map_err(|_| AppError::bad_request("模型工具参数格式不正确"))?;
-            trace.push("tool.call", name.clone());
-
-            let result = if name == "search_menu" {
-                let query = MenuQuery {
-                    query: arguments
-                        .get("query")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned(),
-                    max_sweet: arguments
-                        .get("maxSweet")
-                        .and_then(Value::as_i64)
-                        .map(|value| value.clamp(0, 5) as i32),
-                    min_sour: arguments
-                        .get("minSour")
-                        .and_then(Value::as_i64)
-                        .map(|value| value.clamp(0, 5) as i32),
-                    max_strong: arguments
-                        .get("maxStrong")
-                        .and_then(Value::as_i64)
-                        .map(|value| value.clamp(0, 5) as i32),
-                };
-                let mut recipes = menu::search(pool, user_id, &query).await?;
-                recipes.truncate(MENU_RESULT_LIMIT);
-                for recipe in &recipes {
-                    candidates.insert(recipe.id.clone(), recipe.clone());
-                }
-                let results = recipes
-                    .iter()
-                    .map(compact_recipe)
-                    .collect::<Result<Vec<_>, AppError>>()?;
-                serde_json::to_value(results).map_err(|_| AppError::internal())?
-            } else if name == "get_recipe" {
-                let requested_id = arguments
-                    .get("id")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned();
-                let recipe = match candidates.get(&requested_id) {
-                    Some(recipe) => recipe.clone(),
-                    None => menu::get(pool, user_id, &requested_id).await?,
-                };
-                candidates.insert(recipe.id.clone(), recipe.clone());
-                serde_json::to_value(&recipe).map_err(|_| AppError::internal())?
-            } else {
-                json!({ "error": format!("unknown tool: {name}") })
-            };
-
-            messages.push(json!({
-                "role": "tool",
-                "tool_call_id": id,
-                "content": serde_json::to_string(&result).map_err(|_| AppError::internal())?,
-            }));
-        }
-    }
-
-    Err(AppError::bad_request(
-        "Agent 工具调用次数过多，请缩小问题范围后重试",
-    ))
+    crate::agent_runner::run(
+        pool,
+        user_id,
+        settings,
+        &input.message,
+        api_key,
+        history,
+        trace.clone(),
+    )
+    .await
 }
