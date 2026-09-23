@@ -989,6 +989,19 @@ test('web local recommendation queries the server without any model API', async 
   await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }) }));
   await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  const profileEvents: any[] = [];
+  await page.route('**/profile/events', async route => {
+    profileEvents.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'event-1', seq: 1, eventType: 'like', source: 'structured_ui',
+        recipeId: 'gin-tonic', payload: {}, idempotencyKey: 'test-key',
+        traceId: null, occurredAt: '2026-09-23T00:00:00Z', processedAt: '2026-09-23T00:00:00Z',
+      }),
+    });
+  });
   await page.route('**/recommendations/local', async route => {
     const body = route.request().postDataJSON() as { availability: string };
     await expect(() => {
@@ -1017,6 +1030,27 @@ test('web local recommendation queries the server without any model API', async 
   await expect(page.getByText('Bartender · 本地模式')).toBeVisible();
   await expect(page.getByText(/找到 1 款/)).toBeVisible();
   await expect(page.getByRole('heading', { name: '金汤力', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '喜欢', exact: true }).click();
+  await expect(page.getByRole('button', { name: '已记喜欢' })).toBeVisible();
+  await expect(page.getByText('已用于调整你的口味画像。')).toBeVisible();
+  await expect(profileEvents).toHaveLength(1);
+  expect(profileEvents[0]).toMatchObject({
+    eventType: 'like',
+    recipeId: 'gin-tonic',
+    traceId: null,
+    idempotencyKey: 'recommendation:web-local-1:gin-tonic:like',
+  });
+
+  await page.getByRole('button', { name: '调整口味' }).click();
+  await page.getByRole('button', { name: '太甜' }).click();
+  await expect(page.getByRole('button', { name: '已记太甜' })).toBeVisible();
+  expect(profileEvents[1]).toMatchObject({
+    eventType: 'feedback',
+    recipeId: 'gin-tonic',
+    payload: { dimension: 'sweet', direction: 'lower' },
+    idempotencyKey: 'recommendation:web-local-1:gin-tonic:feedback:sweet-lower',
+  });
 });
 
 test('web chat without a browser key stays local and never calls the server agent', async ({ page }) => {

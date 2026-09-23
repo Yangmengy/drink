@@ -30,3 +30,90 @@
 @media (max-width: 720px) {
   .assistant-content { padding: 12px; }
 }
+.recipe-with-feedback {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recipe-with-feedback .recipe-card {
+  flex: 1;
+}
+
+.recipe-feedback {
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  padding-top: 8px;
+}
+
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.feedback-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.feedback-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  color: var(--text);
+}
+
+.feedback-action.saved {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.feedback-action:disabled {
+  cursor: default;
+  opacity: .72;
+}
+
+.feedback-adjustments {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+}
+
+.feedback-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.feedback-status {
+  min-height: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.feedback-status:not(:empty) {
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .feedback-action {
+    min-height: 32px;
+    font-size: 12px;
+  }
+}

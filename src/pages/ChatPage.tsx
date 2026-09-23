@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useChat } from '../components/ChatContext';
 import { useBar } from '../components/BarContext';
 import { RecipeCard } from '../components/RecipeCard';
+import { RecipeFeedback } from '../components/RecipeFeedback';
 import { LocalRecommendations } from '../components/LocalRecommendations';
 import { ChatTracePanel } from '../components/ChatTracePanel';
 import { ClearChatDialog } from '../components/ClearChatDialog';
@@ -179,7 +180,18 @@ export function ChatPage() {
             <p className="recommendation-note muted">{bar.error || bar.loading ? '当前酒柜尚未同步，暂时显示历史配方。' : '卡片按当前酒柜更新，聊天文字保留当时的建议。'}{bar.error && <button className="text-button" onClick={() => void bar.refresh()}>重新同步</button>}</p>
             <div className="recommendations">{message.recipes.map(r => {
               const current = bar.recipes.find(item => item.id === r.id);
-              return <RecipeCard key={r.id} recipe={current ?? r} inventoryStatus={bar.error || bar.loading ? 'historical' : current ? 'current' : 'removed'} />;
+              return <RecipeCard
+                key={r.id}
+                recipe={current ?? r}
+                inventoryStatus={bar.error || bar.loading ? 'historical' : current ? 'current' : 'removed'}
+                feedback={(
+                  <RecipeFeedback
+                    recipeId={r.id}
+                    contextId={message.traceId || message.id}
+                    traceId={message.traceId}
+                  />
+                )}
+              />;
             })}</div>
           </>}
         </div>

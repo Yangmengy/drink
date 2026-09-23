@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Martini, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import type { Recipe } from '../types';
 
 const images = import.meta.glob('/src-tauri/assets/images/cocktails/*', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-export function RecipeCard({ recipe, inventoryStatus = 'current' }: { recipe: Recipe; inventoryStatus?: 'current' | 'historical' | 'removed' }) {
+export function RecipeCard({ recipe, inventoryStatus = 'current', feedback }: {
+  recipe: Recipe;
+  inventoryStatus?: 'current' | 'historical' | 'removed';
+  feedback?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (open) dialog.current?.showModal(); else dialog.current?.close(); }, [open]);
   const image = recipe.image ? images[`/src-tauri/assets/images/cocktails/${recipe.image.split('/').pop()}`] : undefined;
   const unavailable = inventoryStatus === 'removed' ? '已从酒单移除 · 历史配方' : inventoryStatus === 'historical' ? '库存尚未同步' : '';
-  return <>
+  const card = <>
     <button className="recipe-card" onClick={() => setOpen(true)}>
       <div className="recipe-cover">{image ? <img src={image} alt="" loading="lazy" /> : <Martini size={30} strokeWidth={1.3} />}</div>
       <div className="recipe-card-body">
@@ -31,4 +36,6 @@ export function RecipeCard({ recipe, inventoryStatus = 'current' }: { recipe: Re
       </div>
     </dialog>
   </>;
+  if (!feedback) return card;
+  return <div className="recipe-with-feedback">{card}{feedback}</div>;
 }

@@ -10,6 +10,24 @@ export interface Recipe {
 }
 export interface IngredientInput { name: string; amount: number; unit: string; optional: boolean }
 export interface RecipeInput { id: string | null; name: string; description: string; method: string; flavor: Flavor; ingredients: IngredientInput[]; steps: string[] }
+export type ProfileEventType =
+  | 'quiz_answer' | 'constraint_set' | 'view' | 'favorite' | 'make'
+  | 'like' | 'dislike' | 'feedback' | 'skip';
+
+export interface ProfileEventInput {
+  eventType: ProfileEventType;
+  recipeId?: string | null;
+  payload?: Record<string, unknown>;
+  idempotencyKey: string;
+  traceId?: string | null;
+}
+
+export interface ProfileEvent {
+  id: string; seq: number; eventType: ProfileEventType; source: string;
+  recipeId: string | null; payload: Record<string, unknown>; idempotencyKey: string;
+  traceId: string | null; occurredAt: string; processedAt: string | null;
+}
+
 export interface Settings { name: string; preferences: string; model: string; baseUrl: string; apiKeyConfigured: boolean; dataDirectory: string }
 export interface SettingsInput { name: string; preferences: string; model: string; baseUrl: string; apiKey: string | null }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; text: string; recipes: Recipe[]; traceId?: string | null; mode?: 'agent' | 'local' }
