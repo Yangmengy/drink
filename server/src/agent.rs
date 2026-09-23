@@ -10,7 +10,7 @@ use sqlx::{PgPool, Row};
 
 use crate::{error::AppError, models::*};
 
-const MAX_HISTORY_MESSAGES: usize = 20;
+const MAX_HISTORY_MESSAGES: usize = 16;
 
 #[derive(Clone)]
 pub(super) struct TraceRecorder {
@@ -361,6 +361,9 @@ async fn send_inner(
         })?;
     trace.push("context.load", "读取最近对话");
     let history = load_history(pool, user_id).await?;
+    if let Some(_summary) = &context.summary {
+        trace.push("summary.load", "已注入滚动对话摘要");
+    }
     trace.push(
         "profile.load",
         format!(

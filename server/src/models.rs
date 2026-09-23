@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -191,6 +192,23 @@ pub struct MemoryListQuery {
     pub include_inactive: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextMaintainInput {
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextMaintainResponse {
+    pub maintained: bool,
+    pub reason: Option<String>,
+    pub summary_id: Option<Uuid>,
+    pub covered_messages: i32,
+    pub token_estimate: i32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TraceEvent {
@@ -221,6 +239,7 @@ pub struct ChatSendInput {
 #[derive(Debug, Clone)]
 pub struct AgentContext {
     pub profile: serde_json::Value,
+    pub summary: Option<String>,
     pub memories: Vec<MemoryContextItem>,
 }
 

@@ -591,3 +591,128 @@ async fn profile_memory_and_context_foundations() -> anyhow::Result<()> {
         .await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn context_maintain_compacts_old_messages() -> anyhow::Result<()> {
+    let Some(database_url) = std::env::var("DATABASE_URL").ok() else {
+        eprintln!("DATABASE_URL is not set; context summary PostgreSQL test skipped");
+        return Ok(());
+    };
+    let database = PgPool::connect(&database_url).await?;
+    sqlx::migrate!("./migrations").run(&database).await?;
+    const CONTEXT_EMAIL_HOST: &str = "@context-it.example.com";
+    let email = format!("{}{}", uuid::Uuid::new_v4().simple(), CONTEXT_EMAIL_HOST);
+    sqlx::query("DELETE FROM users WHERE email = $1")
+        .bind(&email)
+        .execute(&database)
+        .await?;
+
+    let model_server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "choices": [{
+                "message": {"content": "{\"summary\":\"用户在测试旧对话摘要。\",\"confirmedFacts\":[\"测试摘要\"]}"}
+            }]
+        })))
+        .mount(&model_server)
+        .await;
+
+    let state = AppState {
+        pool: database.clone(),
+        jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
+        owner_email: Some(email.clone()),
+    };
+    let app = router(state);
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/auth/register",
+        None,
+        Some(json!({"email": email, "password": "a-long-password"})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let registered: Value = parse(response).await?;
+    let token = registered["token"].as_str().expect("token");
+    let user_id: uuid::Uuid = registered["user"]["id"]
+        .as_str()
+        .expect("user id")
+        .parse()?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO companion_settings (user_id, model, base_url)
+        VALUES ($1, 'test-model', $2)
+        "#,
+    )
+    .bind(user_id)
+    .bind(model_server.uri())
+    .execute(&database)
+    .await?;
+    for index in 1..=40 {
+        sqlx::query(
+            r#"
+            INSERT INTO chat_messages (user_id, role, text, mode)
+            VALUES ($1, CASE WHEN $2 % 2 = 0 THEN 'assistant' ELSE 'user' END,
+                    $3, 'agent')
+            "#,
+        )
+        .bind(user_id)
+        .bind(index)
+        .bind(format!("old message {index}"))
+        .execute(&database)
+        .await?;
+    }
+
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/context/maintain",
+        Some(token),
+        Some(json!({"apiKey": "browser-key"})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let result: Value = parse(response).await?;
+    assert_eq!(result["maintained"], true);
+    assert_eq!(result["coveredMessages"], 24);
+
+    let summary: (String, i64, i64) = sqlx::query_as(
+        r#"
+        SELECT summary, from_seq, to_seq
+        FROM chat_context_summaries
+        WHERE user_id = $1 AND status = 'active'
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&database)
+    .await?;
+    assert_eq!(summary.0, "用户在测试旧对话摘要。");
+    let max_seq: i64 =
+        sqlx::query_scalar("SELECT COALESCE(MAX(seq), 0) FROM chat_messages WHERE user_id = $1")
+            .bind(user_id)
+            .fetch_one(&database)
+            .await?;
+    assert_eq!(summary.2, max_seq - 16);
+    assert_eq!(summary.2 - summary.1, 23);
+
+    let response = request_json(
+        app,
+        "POST",
+        "/context/maintain",
+        Some(token),
+        Some(json!({"apiKey": "browser-key"})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let result: Value = parse(response).await?;
+    assert_eq!(result["maintained"], false);
+    assert_eq!(result["reason"], "below_threshold");
+
+    sqlx::query("DELETE FROM users WHERE email = $1")
+        .bind(&email)
+        .execute(&database)
+        .await?;
+    Ok(())
+}

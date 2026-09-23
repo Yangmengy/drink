@@ -1,7 +1,7 @@
 use crate::{
     agent,
     auth::{self, login, register, CurrentUser, OwnerUser},
-    local, memory, menu,
+    context, local, memory, menu,
     models::*,
     observability, profile, settings,
     state::AppState,
@@ -56,6 +56,7 @@ pub fn api() -> Router<AppState> {
         .route("/settings", get(get_settings).put(save_settings))
         .route("/chat", get(chat_history).delete(clear_chat))
         .route("/chat/send", post(send_chat))
+        .route("/context/maintain", post(maintain_context))
         .route("/traces", get(list_traces))
         .route("/observability/summary", get(observability_summary))
 }
@@ -178,11 +179,23 @@ async fn send_chat(
         .collect();
     let context = AgentContext {
         profile: user_profile,
+        summary: context::active_summary_text(&state.pool, user.id).await?,
         memories,
     };
     agent::send(&state.pool, user.id, &profile, &context, &input)
         .await
         .map(Json)
+}
+
+async fn maintain_context(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<ContextMaintainInput>,
+) -> Result<Json<ContextMaintainResponse>, crate::error::AppError> {
+    let profile = settings::get(&state.pool, user.id).await?;
+    Ok(Json(
+        context::maintain(&state.pool, user.id, &profile, &input).await?,
+    ))
 }
 
 async fn list_traces(

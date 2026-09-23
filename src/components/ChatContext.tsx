@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, errorText, errorTraceId } from '../api/client';
+import { api, errorText, errorTraceId, isNative } from '../api/client';
 import type { ChatMessage, ChatStreamEvent, LiveReply, LocalRecommendationInput } from '../types';
 interface ChatState {
   messages: ChatMessage[]; pending: string; loading: boolean; clearing: boolean; error: string;
@@ -53,6 +53,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (response.mode === 'local') setConfigured(false);
       else setConfigured(true);
       setMessages(current => [...current, { id: `${response.id}-user`, role: 'user', text: message, recipes: [] }, response]);
+      if (!isNative() && response.mode === 'agent') {
+        void api.maintainContext().catch(() => undefined);
+      }
       return true;
     } catch (e) {
       setError(errorText(e)); setFailed(message);

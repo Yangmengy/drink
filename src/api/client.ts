@@ -1,5 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot } from '../types';
+import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot, ContextMaintainResult } from '../types';
 import { desktopSnapshot } from '../lib/observability';
 export const isNative = () => '__TAURI_INTERNALS__' in window;
 
@@ -113,6 +113,11 @@ export const api = {
     ? streamCall<LocalRecommendationResult>('recommend_local', { input }, onEvent)
     : http<LocalRecommendationResult>('/recommendations/local', { method: 'POST', body: JSON.stringify(input) }),
   clear: () => webOrNative<void>('clear_chat_history', () => http<void>('/chat', { method: 'DELETE' })),
+  maintainContext: async (): Promise<ContextMaintainResult> => {
+    const modelKey = getModelKey();
+    if (!modelKey) return { maintained: false, reason: 'missing_api_key', summaryId: null, coveredMessages: 0, tokenEstimate: 0 };
+    return http<ContextMaintainResult>('/context/maintain', { method: 'POST', body: JSON.stringify({ apiKey: modelKey }) });
+  },
   traces: () => webOrNative<AgentTrace[]>('list_agent_traces', () => http<AgentTrace[]>('/traces')),
   observability: async (): Promise<ObservabilitySnapshot> => {
     if (isNative()) return desktopSnapshot(await api.traces());
