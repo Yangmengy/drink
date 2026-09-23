@@ -73,6 +73,8 @@ pub struct Recipe {
     pub steps: Vec<String>,
     pub missing: Vec<String>,
     pub can_make: bool,
+    #[serde(skip)]
+    pub score: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,6 +185,12 @@ fn default_agent_mode() -> String {
     "agent".to_owned()
 }
 
+#[derive(Debug, Deserialize)]
+pub struct MemoryListQuery {
+    #[serde(default)]
+    pub include_inactive: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TraceEvent {
@@ -208,4 +216,18 @@ pub struct ChatSendInput {
     pub message: String,
     #[serde(default)]
     pub api_key: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AgentContext {
+    pub profile: serde_json::Value,
+    pub memories: Vec<MemoryContextItem>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MemoryContextItem {
+    pub kind: String,
+    pub content: String,
+    pub confidence: f64,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }

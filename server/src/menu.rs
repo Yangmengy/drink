@@ -1,6 +1,6 @@
-use crate::{error::AppError, models::*};
+use crate::{error::AppError, models::*, profile};
 use sqlx::{PgConnection, PgPool, Row};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub async fn inventory(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<Ingredient>, AppError> {
     let rows = sqlx::query_as::<_, Ingredient>(
@@ -248,6 +248,7 @@ async fn read_menu(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<Recipe>, Ap
             ingredients,
             missing: Vec::new(),
             can_make: false,
+            score: 0.0,
         });
     }
     Ok(recipes)
@@ -264,6 +265,7 @@ pub async fn search(
 
     let (mut recipes, inventory) =
         tokio::try_join!(read_menu(pool, user_id), inventory(pool, user_id))?;
+    let profile = profile::projection(pool, user_id).await?;
     let owned: HashSet<String> = inventory
         .iter()
         .filter(|ingredient| ingredient.owned)
@@ -308,8 +310,95 @@ pub async fn search(
         };
         (keyword.is_empty() || haystack.contains(&keyword)) && flavor_matches
     });
-    recipes.sort_by_key(|recipe| (!recipe.can_make, recipe.missing.len()));
+
+    let ingredient_categories: HashMap<String, String> =
+        sqlx::query("SELECT id, category FROM ingredients WHERE user_id = $1 OR user_id IS NULL")
+            .bind(user_id)
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(|row| {
+                let id: String = row.get("id");
+                let category: String = row.get("category");
+                (id, category)
+            })
+            .collect();
+
+    recipes.retain(|recipe| {
+        !profile.constraints.no_alcohol
+            || !recipe.ingredients.iter().any(|item| {
+                ingredient_categories
+                    .get(&item.ingredient_id)
+                    .is_some_and(|category: &String| {
+                        matches!(category.as_str(), "spirits" | "liqueur" | "wine" | "beer")
+                    })
+            })
+    });
+    let allergens: Vec<String> = profile
+        .constraints
+        .allergies
+        .iter()
+        .chain(profile.constraints.avoid_ingredients.iter())
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty())
+        .collect();
+    if !allergens.is_empty() {
+        recipes.retain(|recipe| {
+            !recipe.ingredients.iter().any(|item| {
+                let name = item.name.trim().to_lowercase();
+                allergens.iter().any(|allergen| {
+                    name.contains(allergen.as_str()) || allergen.contains(name.as_str())
+                })
+            })
+        });
+    }
+    rank_by_profile(&mut recipes, &profile);
     Ok(recipes)
+}
+
+fn rank_by_profile(recipes: &mut [Recipe], profile: &profile::Projection) {
+    let flavor_confidence = [
+        profile.confidence.flavor.sweet,
+        profile.confidence.flavor.sour,
+        profile.confidence.flavor.bitter,
+        profile.confidence.flavor.strong,
+    ]
+    .iter()
+    .sum::<f64>()
+        / 4.0;
+    let default_flavor = profile::FlavorPreference::default();
+    for recipe in &mut *recipes {
+        let target = profile.preferences.flavor.clone();
+        let flavor = recipe
+            .flavor
+            .clone()
+            .map_or(default_flavor.clone(), |flavor| profile::FlavorPreference {
+                sweet: flavor.sweet as f64,
+                sour: flavor.sour as f64,
+                bitter: flavor.bitter as f64,
+                strong: flavor.strong as f64,
+            });
+        let difference = (target.sweet - flavor.sweet).abs()
+            + (target.sour - flavor.sour).abs()
+            + (target.bitter - flavor.bitter).abs()
+            + (target.strong - flavor.strong).abs();
+        let flavor_score = 1.0 - difference / 20.0;
+        let availability_score = if recipe.can_make {
+            1.0
+        } else {
+            (1.0 - recipe.missing.len().min(3) as f64 * 0.25).max(0.0)
+        };
+        let profile_score = flavor_score * (0.25 + flavor_confidence * 0.45);
+        recipe.score = profile_score + availability_score;
+    }
+    recipes.sort_by(|left, right| {
+        right
+            .score
+            .partial_cmp(&left.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(right.can_make.cmp(&left.can_make))
+            .then(left.missing.len().cmp(&right.missing.len()))
+    });
 }
 
 pub async fn get(pool: &PgPool, user_id: uuid::Uuid, id: &str) -> Result<Recipe, AppError> {

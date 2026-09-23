@@ -1,17 +1,18 @@
 use crate::{
     agent,
     auth::{self, login, register, CurrentUser, OwnerUser},
-    local, menu,
+    local, memory, menu,
     models::*,
-    observability, settings,
+    observability, profile, settings,
     state::AppState,
 };
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
+use uuid::Uuid;
 
 pub async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "ok" }))
@@ -36,6 +37,22 @@ pub fn api() -> Router<AppState> {
         .route("/recipes", get(search_recipes).post(save_recipe))
         .route("/recipes/{id}", get(get_recipe).delete(delete_recipe))
         .route("/recommendations/local", post(recommend_local))
+        .route("/profile", get(get_profile).post(rebuild_profile))
+        .route("/profile/events", post(create_profile_event))
+        .route(
+            "/memory/statements",
+            get(list_memory_statements)
+                .post(create_memory_statement)
+                .delete(clear_auto_memory),
+        )
+        .route(
+            "/memory/statements/{id}",
+            delete(delete_memory_statement).post(revoke_memory_statement),
+        )
+        .route(
+            "/memory/settings",
+            get(get_memory_settings).put(save_memory_settings),
+        )
         .route("/settings", get(get_settings).put(save_settings))
         .route("/chat", get(chat_history).delete(clear_chat))
         .route("/chat/send", post(send_chat))
@@ -148,7 +165,22 @@ async fn send_chat(
     Json(input): Json<ChatSendInput>,
 ) -> Result<Json<ChatMessage>, crate::error::AppError> {
     let profile = settings::get(&state.pool, user.id).await?;
-    agent::send(&state.pool, user.id, &profile, &input)
+    let user_profile = profile::context_for_user(&state.pool, user.id).await?;
+    let memories = memory::active_context(&state.pool, user.id)
+        .await?
+        .into_iter()
+        .map(|statement| crate::models::MemoryContextItem {
+            kind: statement.kind,
+            content: statement.content,
+            confidence: statement.confidence,
+            expires_at: statement.expires_at,
+        })
+        .collect();
+    let context = AgentContext {
+        profile: user_profile,
+        memories,
+    };
+    agent::send(&state.pool, user.id, &profile, &context, &input)
         .await
         .map(Json)
 }
@@ -158,6 +190,91 @@ async fn list_traces(
     user: CurrentUser,
 ) -> Result<Json<Vec<AgentTrace>>, crate::error::AppError> {
     Ok(Json(agent::traces(&state.pool, user.id).await?))
+}
+
+async fn get_profile(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<profile::UserProfile>, crate::error::AppError> {
+    Ok(Json(profile::get(&state.pool, user.id).await?))
+}
+
+async fn create_profile_event(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<profile::ProfileEventInput>,
+) -> Result<Json<profile::ProfileEvent>, crate::error::AppError> {
+    Ok(Json(
+        profile::record_event(&state.pool, user.id, &input).await?,
+    ))
+}
+
+async fn rebuild_profile(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<profile::UserProfile>, crate::error::AppError> {
+    Ok(Json(profile::rebuild(&state.pool, user.id).await?))
+}
+
+async fn list_memory_statements(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Query(include): Query<MemoryListQuery>,
+) -> Result<Json<Vec<memory::MemoryStatement>>, crate::error::AppError> {
+    Ok(Json(
+        memory::list(&state.pool, user.id, include.include_inactive).await?,
+    ))
+}
+
+async fn create_memory_statement(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<memory::MemoryStatementInput>,
+) -> Result<Json<memory::MemoryStatement>, crate::error::AppError> {
+    Ok(Json(memory::create(&state.pool, user.id, &input).await?))
+}
+
+async fn delete_memory_statement(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, crate::error::AppError> {
+    memory::delete(&state.pool, user.id, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn revoke_memory_statement(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, crate::error::AppError> {
+    memory::revoke(&state.pool, user.id, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn clear_auto_memory(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<serde_json::Value>, crate::error::AppError> {
+    let deleted = memory::clear_low_risk(&state.pool, user.id).await?;
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
+async fn get_memory_settings(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<memory::MemorySettings>, crate::error::AppError> {
+    Ok(Json(memory::settings(&state.pool, user.id).await?))
+}
+
+async fn save_memory_settings(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<memory::MemorySettingsInput>,
+) -> Result<Json<memory::MemorySettings>, crate::error::AppError> {
+    Ok(Json(
+        memory::save_settings(&state.pool, user.id, &input).await?,
+    ))
 }
 
 async fn observability_summary(

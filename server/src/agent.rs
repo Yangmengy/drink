@@ -310,13 +310,14 @@ pub async fn send(
     pool: &PgPool,
     user_id: uuid::Uuid,
     settings: &Settings,
+    context: &AgentContext,
     input: &ChatSendInput,
 ) -> Result<ChatMessage, AppError> {
     let trace = TraceRecorder::start();
     let trace_id = trace.id.clone();
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(90),
-        send_inner(pool, user_id, settings, input, &trace),
+        send_inner(pool, user_id, settings, context, input, &trace),
     )
     .await
     .unwrap_or_else(|_| Err(AppError::bad_request("模型调用整体超时，请稍后重试")));
@@ -343,6 +344,7 @@ async fn send_inner(
     pool: &PgPool,
     user_id: uuid::Uuid,
     settings: &Settings,
+    context: &AgentContext,
     input: &ChatSendInput,
     trace: &TraceRecorder,
 ) -> Result<ChatMessage, AppError> {
@@ -359,10 +361,23 @@ async fn send_inner(
         })?;
     trace.push("context.load", "读取最近对话");
     let history = load_history(pool, user_id).await?;
+    trace.push(
+        "profile.load",
+        format!(
+            "注入画像 revision {} 和 {} 条记忆",
+            context
+                .profile
+                .get("revision")
+                .and_then(Value::as_i64)
+                .unwrap_or(0),
+            context.memories.len()
+        ),
+    );
     crate::agent_runner::run(
         pool,
         user_id,
         settings,
+        context,
         &input.message,
         api_key,
         history,

@@ -46,6 +46,10 @@ impl AppError {
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    pub fn is_not_found(&self) -> bool {
+        self.status == StatusCode::NOT_FOUND
+    }
 }
 
 impl IntoResponse for AppError {
