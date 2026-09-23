@@ -39,7 +39,7 @@ jobs:
         with:
           workspaces: server
       - run: cargo fmt --check --manifest-path server/Cargo.toml
-      - run: cargo clippy --all-targets -- -D warnings --manifest-path server/Cargo.toml
+      - run: cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path server/Cargo.toml
         env:
           DATABASE_URL: postgres://test:test@127.0.0.1:5432/drink_test
