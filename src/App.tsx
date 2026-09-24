@@ -1,9 +1,10 @@
 import { BrowserRouter, NavLink, Route, Routes, Navigate, useLocation } from 'react-router-dom';
-import { MessageCircle, Wine, NotebookPen, Settings } from 'lucide-react';
+import { MessageCircle, Wine, NotebookPen, Brain, Settings } from 'lucide-react';
 import { ChatPage } from './pages/ChatPage';
 import { BarPage } from './pages/BarPage';
 import { CustomPage } from './pages/CustomPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { ChatProvider } from './components/ChatContext';
 import { BarProvider } from './components/BarContext';
 import { AuthProvider, useAuth } from './components/AuthContext';
@@ -18,6 +19,7 @@ const tabs = [
   { path: '/', label: '聊天', icon: MessageCircle },
   { path: '/bar', label: '酒柜', icon: Wine },
   { path: '/custom', label: '自定义', icon: NotebookPen },
+  { path: '/profile', label: '画像', icon: Brain },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
@@ -90,6 +92,7 @@ function AuthGate() {
               <Route path="/" element={<ChatPage />} />
               <Route path="/bar" element={<BarPage />} />
               <Route path="/custom" element={<CustomPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

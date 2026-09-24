@@ -156,9 +156,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('four entry points, inventory and menu availability', async ({ page }) => {
+test('five entry points, inventory and menu availability', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5);
   await page.getByRole('link', { name: '酒柜', exact: true }).click();
   await page.getByRole('button', { name: '金酒', exact: true }).click();
   await expect(page.getByRole('button', { name: '金酒', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -919,7 +919,7 @@ test('web registration signs in and avoids the desktop preview message', async (
   await page.getByRole('button', { name: '注册新用户', exact: true }).click();
   await expect(page.getByRole('button', { name: '注册并登录', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '注册并登录', exact: true }).click();
-  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5);
   await expect(page.getByText('当前为界面预览。请运行 npm run tauri:dev，使用本地酒柜和 Agent。')).toHaveCount(0);
   await expect(page.getByText('本地模式')).toBeVisible();
   await page.getByRole('link', { name: '设置', exact: true }).click();
@@ -969,7 +969,7 @@ test('web session token survives a temporary auth status check failure', async (
   await page.route('**/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }) }));
   await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.reload();
-  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(4);
+  await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(5);
   await expect(page.getByText('web@example.com')).toBeVisible();
 });
 
@@ -1307,7 +1307,7 @@ test('web profile panel supports onboarding and constraint memories', async ({ p
     }),
   }));
 
-  await page.goto('/settings');
+  await page.goto('/profile');
   await expect(page.getByRole('heading', { name: '口味画像' })).toBeVisible();
   await expect(page.getByText('乳制品过敏')).toBeVisible();
 

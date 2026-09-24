@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { api, errorText } from '../api/client';
 import { useTheme } from '../components/ThemeContext';
 import { AccountCard } from '../components/AccountCard';
-import { ProfileMemoryPanel } from '../components/ProfileMemoryPanel';
 import { themes } from '../theme';
 import type { Settings, AgentTrace } from '../types';
 
@@ -61,7 +60,6 @@ export function SettingsPage() {
         <span className="eyebrow">A FEW THINGS ABOUT YOU</span>
       </header>
       <AccountCard />
-      <ProfileMemoryPanel />
       {error && <div className="error" role="alert">{error}</div>}
 
 
