@@ -3,15 +3,13 @@ name: Server build and deploy
 on:
   push:
     branches: [main]
-    paths:
-      - "server/**"
-      - "adk-rust/**"
-      - "deploy/**"
-      - ".github/workflows/server-deploy.yml"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/drink-server
+  SERVER_HOST: 47.104.88.207
+  SERVER_USER: root
+  SERVER_DIR: /opt/drink/deploy
 
 jobs:
   test:
@@ -74,3 +72,42 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-frontend:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Sync dist to server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          tar -C dist -czf /tmp/dist.tar.gz .
+          scp -i ~/.ssh/deploy_key /tmp/dist.tar.gz ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:/tmp/
+          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} \
+            "rm -rf ${{ env.SERVER_DIR }}/html/* && tar -C ${{ env.SERVER_DIR }}/html -xzf /tmp/dist.tar.gz && rm /tmp/dist.tar.gz"
+
+  deploy-backend:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and restart API container
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} \
+            "cd ${{ env.SERVER_DIR }} && docker compose pull api && docker compose up -d api"
