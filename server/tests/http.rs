@@ -703,7 +703,15 @@ async fn context_maintain_compacts_old_messages() -> anyhow::Result<()> {
             .fetch_one(&database)
             .await?;
     assert_eq!(summary.2, max_seq - 16);
-    assert_eq!(summary.2 - summary.1, 23);
+    let candidate_seqs: Vec<i64> = sqlx::query_scalar(
+        "SELECT seq FROM chat_messages WHERE user_id = $1 AND seq <= $2 ORDER BY seq",
+    )
+    .bind(user_id)
+    .bind(summary.2)
+    .fetch_all(&database)
+    .await?;
+    assert_eq!(candidate_seqs.len(), 24);
+    assert_eq!(*candidate_seqs.first().expect("candidate seqs"), summary.1);
 
     let response = request_json(
         app,
