@@ -1,4 +1,4 @@
-import type { AgentTrace, ObservabilityLatency, ObservabilityPhase, ObservabilitySnapshot, ObservabilityTimelinePoint, ObservabilityTotals } from '../types';
+import type { AgentTrace, ObservabilityLatency, ObservabilityPhase, ObservabilitySnapshot, ObservabilityTimelinePoint, ObservabilityTotals, ObservabilityContext } from '../types';
 
 function percentile(values: number[], ratio: number): number {
   if (!values.length) return 0;
@@ -82,6 +82,12 @@ export function analyzeTraces(traces: AgentTrace[]): {
   };
 }
 
+const emptyContext: ObservabilityContext = {
+  activeSummaries: 0, archivedSummaries: 0, messagesTotal: 0, usersWithMessages: 0,
+  latestCoveredMessages: 0, latestTokenEstimate: 0, latestModel: '-',
+  latestPromptVersion: '-', latestCreatedAt: null, status: 'no_messages',
+};
+
 export function desktopSnapshot(traces: AgentTrace[]): ObservabilitySnapshot {
   const aggregate = analyzeTraces(traces);
   const sorted = [...traces].sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id));
@@ -92,6 +98,7 @@ export function desktopSnapshot(traces: AgentTrace[]): ObservabilitySnapshot {
     retention: 100,
     database: 'ok',
     ...aggregate,
+    context: emptyContext,
     traces: sorted,
   };
 }

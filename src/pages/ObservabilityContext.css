@@ -1,0 +1,41 @@
+.ops-context-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ops-context-grid article {
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+}
+
+.ops-context-grid span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ops-context-grid strong {
+  display: block;
+  margin: 8px 0 3px;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-context-grid small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .ops-context-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

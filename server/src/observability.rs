@@ -2,9 +2,41 @@ use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 
 use crate::{agent, error::AppError, models::AgentTrace};
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextObservability {
+    pub active_summaries: i64,
+    pub archived_summaries: i64,
+    pub messages_total: i64,
+    pub users_with_messages: i64,
+    pub latest_covered_messages: i64,
+    pub latest_token_estimate: i64,
+    pub latest_model: String,
+    pub latest_prompt_version: String,
+    pub latest_created_at: Option<DateTime<Utc>>,
+    pub status: String,
+}
+
+impl Default for ContextObservability {
+    fn default() -> Self {
+        Self {
+            active_summaries: 0,
+            archived_summaries: 0,
+            messages_total: 0,
+            users_with_messages: 0,
+            latest_covered_messages: 0,
+            latest_token_estimate: 0,
+            latest_model: "-".to_owned(),
+            latest_prompt_version: "-".to_owned(),
+            latest_created_at: None,
+            status: "no_messages".to_owned(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,12 +89,81 @@ pub struct ObservabilitySnapshot {
     pub timeline: Vec<TimelinePoint>,
     pub phases: Vec<PhaseStat>,
     pub traces: Vec<AgentTrace>,
+    pub context: ContextObservability,
 }
 
 pub async fn summary(pool: &PgPool) -> Result<ObservabilitySnapshot, AppError> {
     sqlx::query("SELECT 1").execute(pool).await?;
     let traces = agent::all_traces(pool).await?;
-    Ok(analyze(traces, "server", "ok"))
+    let context = context_status(pool).await?;
+    let mut snapshot = analyze(traces, "server", "ok");
+    snapshot.context = context;
+    Ok(snapshot)
+}
+
+async fn context_status(pool: &PgPool) -> Result<ContextObservability, AppError> {
+    let active_summaries =
+        sqlx::query_scalar("SELECT COUNT(*) FROM chat_context_summaries WHERE status = 'active'")
+            .fetch_one(pool)
+            .await?;
+    let archived_summaries =
+        sqlx::query_scalar("SELECT COUNT(*) FROM chat_context_summaries WHERE status = 'archived'")
+            .fetch_one(pool)
+            .await?;
+    let messages_total = sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages")
+        .fetch_one(pool)
+        .await?;
+    let users_with_messages =
+        sqlx::query_scalar("SELECT COUNT(DISTINCT user_id) FROM chat_messages")
+            .fetch_one(pool)
+            .await?;
+    let latest_row = sqlx::query(
+        r#"
+        SELECT covered_message_count, token_estimate, model, prompt_version, created_at
+        FROM chat_context_summaries
+        WHERE status = 'active'
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(pool)
+    .await?;
+    let status = if messages_total == 0 {
+        "no_messages"
+    } else if active_summaries > 0 {
+        "has_summary"
+    } else {
+        "no_summary"
+    };
+    let (
+        latest_covered_count,
+        latest_token_count,
+        latest_model,
+        latest_prompt_version,
+        latest_created_at,
+    ) = if let Some(row) = latest_row {
+        (
+            row.try_get::<i32, _>("covered_message_count")?,
+            row.try_get::<i32, _>("token_estimate")?,
+            row.try_get::<String, _>("model")?,
+            row.try_get::<String, _>("prompt_version")?,
+            row.try_get::<Option<DateTime<Utc>>, _>("created_at")?,
+        )
+    } else {
+        Default::default()
+    };
+    Ok(ContextObservability {
+        active_summaries,
+        archived_summaries,
+        messages_total,
+        users_with_messages,
+        latest_covered_messages: latest_covered_count.into(),
+        latest_token_estimate: latest_token_count.into(),
+        latest_model,
+        latest_prompt_version,
+        latest_created_at,
+        status: status.to_owned(),
+    })
 }
 
 pub fn analyze(mut traces: Vec<AgentTrace>, source: &str, database: &str) -> ObservabilitySnapshot {
@@ -88,6 +189,7 @@ pub fn analyze(mut traces: Vec<AgentTrace>, source: &str, database: &str) -> Obs
         timeline,
         phases,
         traces,
+        context: ContextObservability::default(),
     }
 }
 

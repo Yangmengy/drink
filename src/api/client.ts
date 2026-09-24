@@ -1,5 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot, ContextMaintainResult, ProfileEvent, ProfileEventInput } from '../types';
+import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot, ContextMaintainResult, ProfileEvent, ProfileEventInput, UserProfile, MemoryStatement, MemoryStatementInput, MemorySettings } from '../types';
 import { desktopSnapshot } from '../lib/observability';
 export const isNative = () => '__TAURI_INTERNALS__' in window;
 
@@ -117,6 +117,37 @@ export const api = {
     const modelKey = getModelKey();
     if (!modelKey) return { maintained: false, reason: 'missing_api_key', summaryId: null, coveredMessages: 0, tokenEstimate: 0 };
     return http<ContextMaintainResult>('/context/maintain', { method: 'POST', body: JSON.stringify({ apiKey: modelKey }) });
+  },
+  profile: async (): Promise<UserProfile | null> => {
+    if (isNative()) return null;
+    try { return await http<UserProfile>('/profile'); }
+    catch (error) {
+      if (error instanceof Error && error.message.includes('画像尚未生成')) return null;
+      throw error;
+    }
+  },
+  rebuildProfile: () => http<UserProfile>('/profile', { method: 'POST' }),
+  memoryStatements: (includeInactive = false) => {
+    if (isNative()) return Promise.resolve([]);
+    return http<MemoryStatement[]>(`/memory/statements?includeInactive=${includeInactive}`);
+  },
+  createMemoryStatement: (input: MemoryStatementInput) => {
+    if (isNative()) return Promise.reject(new Error('记忆管理目前支持 Web 登录账号。'));
+    return http<MemoryStatement>('/memory/statements', { method: 'POST', body: JSON.stringify(input) });
+  },
+  deleteMemoryStatement: (id: string) => http<void>(`/memory/statements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  revokeMemoryStatement: (id: string) => http<void>(`/memory/statements/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
+  clearAutoMemory: async () => {
+    if (isNative()) return { deleted: 0 };
+    return await http<{ deleted: number }>('/memory/statements', { method: 'DELETE' });
+  },
+  memorySettings: () => {
+    if (isNative()) return Promise.reject(new Error('记忆管理目前支持 Web 登录账号。'));
+    return http<MemorySettings>('/memory/settings');
+  },
+  saveMemorySettings: (input: Omit<MemorySettings, 'updatedAt'>) => {
+    if (isNative()) return Promise.reject(new Error('记忆管理目前支持 Web 登录账号。'));
+    return http<MemorySettings>('/memory/settings', { method: 'PUT', body: JSON.stringify(input) });
   },
   recordProfileEvent: (input: ProfileEventInput) => {
     if (isNative()) return Promise.reject(new Error('画像反馈目前支持 Web 登录账号。'));

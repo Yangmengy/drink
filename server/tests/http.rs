@@ -552,7 +552,10 @@ async fn profile_memory_and_context_foundations() -> anyhow::Result<()> {
             "kind": "constraint",
             "content": "对乳制品过敏。",
             "source": "structured_ui",
-            "retentionPolicy": "explicit"
+            "retentionPolicy": "explicit",
+            "constraintPayload": {
+                "constraints": {"noAlcohol": true, "allergies": ["dairy"]}
+            }
         })),
     )
     .await?;
@@ -565,6 +568,11 @@ async fn profile_memory_and_context_foundations() -> anyhow::Result<()> {
     assert_eq!(response.status(), StatusCode::OK);
     let statements: Value = parse(response).await?;
     assert_eq!(statements.as_array().unwrap().len(), 1);
+
+    let profile_after_memory: Value =
+        parse(request_json(app.clone(), "GET", "/profile", Some(token), None).await?).await?;
+    assert_eq!(profile_after_memory["constraints"]["noAlcohol"], true);
+    assert_eq!(profile_after_memory["constraints"]["allergies"][0], "dairy");
 
     let response = request_json(app.clone(), "GET", "/memory/settings", Some(token), None).await?;
     assert_eq!(response.status(), StatusCode::OK);

@@ -4,7 +4,8 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::{error::AppError, profile};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +35,8 @@ pub struct MemoryStatementInput {
     pub confidence: Option<f64>,
     #[serde(default)]
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(default)]
+    pub constraint_payload: Option<Value>,
 }
 
 fn default_source() -> String {
@@ -146,8 +149,12 @@ pub async fn create(
     if !(0.0..=1.0).contains(&confidence) || !confidence.is_finite() {
         return Err(AppError::bad_request("记忆置信度必须在 0–1 之间"));
     }
+    if input.kind == "constraint" && input.constraint_payload.is_none() {
+        return Err(AppError::bad_request("约束记忆需要同时提供结构化约束数据"));
+    }
 
     let normalized_key = normalized_key(content);
+    let mut transaction = pool.begin().await?;
     let statement = sqlx::query_as::<_, MemoryStatement>(
         r#"
         INSERT INTO user_memory_statements
@@ -170,7 +177,7 @@ pub async fn create(
     .bind(&input.retention_policy)
     .bind(confidence)
     .bind(input.expires_at)
-    .fetch_one(pool)
+    .fetch_one(&mut *transaction)
     .await
     .map_err(|error| match error {
         sqlx::Error::Database(database) if database.is_unique_violation() => {
@@ -178,6 +185,29 @@ pub async fn create(
         }
         error => error.into(),
     })?;
+
+    if input.kind == "constraint" {
+        let payload = input
+            .constraint_payload
+            .clone()
+            .expect("constraint payload is required");
+        profile::record_event_on(
+            &mut transaction,
+            user_id,
+            &profile::ProfileEventInput {
+                event_type: "constraint_set".to_owned(),
+                source: input.source.clone(),
+                recipe_id: None,
+                payload,
+                idempotency_key: Some(format!("memory:{}", statement.id)),
+                trace_id: None,
+            },
+        )
+        .await?;
+        profile::rebuild_on(&mut transaction, user_id).await?;
+    }
+
+    transaction.commit().await?;
     Ok(statement)
 }
 

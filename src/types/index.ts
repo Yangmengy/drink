@@ -28,6 +28,35 @@ export interface ProfileEvent {
   traceId: string | null; occurredAt: string; processedAt: string | null;
 }
 
+export interface ProfileConstraints { noAlcohol:boolean; allergies:string[]; avoidIngredients:string[]; maxAbvLevel:number | null }
+export interface FlavorPreference { sweet:number; sour:number; bitter:number; strong:number }
+export interface ProfilePreferences { flavor:FlavorPreference; baseSpirit:Record<string, number>; tagAffinity:Record<string, number> }
+export interface ProfileConfidence { flavor: FlavorPreference }
+export interface UserProfile {
+  schemaVersion:number; constraints:ProfileConstraints; preferences:ProfilePreferences;
+  confidence:ProfileConfidence; profileRevision:number; lastEventSeq:number | null;
+  computedAt:string | null; updatedAt:string;
+}
+export interface MemoryStatement {
+  id:string; kind:'preference'|'constraint'|'context'|'goal'; content:string; source:string;
+  retentionPolicy:'explicit'|'auto_low_risk'|'temporary_context'; confidence:number;
+  status:'active'|'superseded'|'revoked'|'expired'; expiresAt:string | null;
+  lastSeenAt:string; createdAt:string;
+}
+export interface MemoryStatementInput {
+  kind:MemoryStatement['kind']; content:string; source:'structured_ui'|'chat_confirmed'|'summary_confirmed';
+  retentionPolicy:MemoryStatement['retentionPolicy']; confidence?:number; expiresAt?:string | null;
+  constraintPayload?: { constraints: Partial<ProfileConstraints> };
+}
+export interface MemorySettings {
+  allowAutoLowRisk:boolean; lowRiskTtlDays:number; allowTemporaryContext:boolean;
+  temporaryContextTtlDays:number; updatedAt:string;
+}
+export interface ObservabilityContext {
+  activeSummaries:number; archivedSummaries:number; messagesTotal:number; usersWithMessages:number;
+  latestCoveredMessages:number; latestTokenEstimate:number; latestModel:string;
+  latestPromptVersion:string; latestCreatedAt:string | null; status:'has_summary'|'no_summary'|'no_messages';
+}
 export interface Settings { name: string; preferences: string; model: string; baseUrl: string; apiKeyConfigured: boolean; dataDirectory: string }
 export interface SettingsInput { name: string; preferences: string; model: string; baseUrl: string; apiKey: string | null }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; text: string; recipes: Recipe[]; traceId?: string | null; mode?: 'agent' | 'local' }
@@ -54,5 +83,5 @@ export interface ObservabilityPhase { phase: string; total: number; averageMs: n
 export interface ObservabilitySnapshot {
   source: 'desktop' | 'server'; generatedAt: number; windowHours: number; retention: number; database: string;
   totals: ObservabilityTotals; latency: ObservabilityLatency; timeline: ObservabilityTimelinePoint[];
-  phases: ObservabilityPhase[]; traces: AgentTrace[];
+  phases: ObservabilityPhase[]; traces: AgentTrace[]; context: ObservabilityContext;
 }

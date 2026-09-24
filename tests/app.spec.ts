@@ -1149,6 +1149,9 @@ test('web settings save model preferences without sending the API key to the ser
   await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/profile', route => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: '画像尚未生成' }) }));
+  await page.route('**/memory/settings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ allowAutoLowRisk: false, lowRiskTtlDays: 180, allowTemporaryContext: false, temporaryContextTtlDays: 7, updatedAt: '2026-09-24T00:00:00Z' }) }));
+  await page.route('**/memory/statements', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
 
   let savedRequestBody: Record<string, unknown> | undefined;
   await page.route(/\/api\/settings$/, async route => {
@@ -1223,4 +1226,109 @@ test('desktop chat scrolls inside the fixed right panel', async ({ page }) => {
   expect(scrolledDown.composer).toEqual(scrolledUp.composer);
   expect(scrolledDown.bodyScroll).toBe(0);
   expect(scrolledUp.bodyScroll).toBe(0);
+});
+
+test('web profile panel supports onboarding and constraint memories', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-21T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, body: '[]', contentType: 'application/json' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, body: '[]', contentType: 'application/json' }));
+  await page.route('**/chat', route => route.fulfill({ status: 200, body: '[]', contentType: 'application/json' }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, body: '[]', contentType: 'application/json' }));
+  await page.route(/\/api\/settings$/, route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ name: 'Yang', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: false, dataDirectory: 'browser' }),
+  }));
+
+  const profileEvents: any[] = [];
+  const memoryBodies: any[] = [];
+  let memoryDeleted = 0;
+  await page.route(/\/api\/profile\/events$/, async route => {
+    profileEvents.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'event-1', seq: 1, eventType: 'quiz_answer', source: 'structured_ui', recipeId: null, payload: {}, idempotencyKey: 'quiz', traceId: null, occurredAt: '2026-09-24T00:00:00Z', processedAt: null }),
+    });
+  });
+  await page.route(/\/api\/memory\/settings$/, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ allowAutoLowRisk: false, lowRiskTtlDays: 180, allowTemporaryContext: false, temporaryContextTtlDays: 7, updatedAt: '2026-09-24T00:00:00Z' }),
+    });
+  });
+  await page.route(/\/api\/memory\/statements\/[^/?]+$/, async route => {
+    if (route.request().method() === 'DELETE') {
+      memoryDeleted += 1;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: 1 }) });
+      return;
+    }
+    await route.fulfill({ status: 204, body: '' });
+  });
+  await page.route(/\/api\/memory\/statements(\?.*)?$/, async route => {
+    if (route.request().method() === 'POST') {
+      memoryBodies.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'memory-1', kind: 'constraint', content: '对乳制品过敏。', source: 'structured_ui', retentionPolicy: 'explicit', confidence: 0.8, status: 'active', expiresAt: null, lastSeenAt: '2026-09-24T00:00:00Z', createdAt: '2026-09-24T00:00:00Z' }),
+      });
+      return;
+    }
+    if (route.request().method() === 'DELETE') {
+      memoryDeleted += 1;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: 1 }) });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 'memory-1', kind: 'constraint', content: '对乳制品过敏。', source: 'structured_ui', retentionPolicy: 'explicit', confidence: 0.8, status: 'active', expiresAt: null, lastSeenAt: '2026-09-24T00:00:00Z', createdAt: '2026-09-24T00:00:00Z' }]),
+    });
+  });
+  await page.route(/\/api\/profile$/, route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      schemaVersion: 1,
+      constraints: { noAlcohol: false, allergies: ['dairy'], avoidIngredients: [], maxAbvLevel: null },
+      preferences: { flavor: { sweet: 1, sour: 4, bitter: 1, strong: 2 }, baseSpirit: {}, tagAffinity: {} },
+      confidence: { flavor: { sweet: .3, sour: .3, bitter: .3, strong: .3 } },
+      profileRevision: 2, lastEventSeq: 3, computedAt: '2026-09-24T00:00:00Z', updatedAt: '2026-09-24T00:00:00Z',
+    }),
+  }));
+
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: '口味画像' })).toBeVisible();
+  await expect(page.getByText('乳制品过敏')).toBeVisible();
+
+  await page.getByRole('checkbox', { name: '乳制品' }).check();
+  await page.getByRole('radio', { name: '偏酸' }).check();
+  await page.getByRole('button', { name: '保存问卷' }).click();
+  await expect(profileEvents).toHaveLength(1);
+  expect(profileEvents[0].payload.constraints.allergies).toEqual(['dairy']);
+  expect(profileEvents[0].payload.preferences.flavor.sour).toBe(4);
+
+  await page.locator('.memory-form select').selectOption('constraint');
+  await page.locator('.memory-form textarea').fill('对乳制品过敏。');
+  await page.locator('.memory-form input').nth(1).fill('dairy');
+  await page.getByRole('button', { name: '保存记忆' }).click();
+  expect(memoryBodies[0]).toMatchObject({
+    kind: 'constraint',
+    content: '对乳制品过敏。',
+    constraintPayload: { constraints: { allergies: ['dairy'] } },
+  });
+
+  page.on('dialog', dialog => void dialog.accept());
+  await page.locator('.memory-item').getByRole('button', { name: '删除' }).click();
+  await expect.poll(() => memoryDeleted).toBe(1);
 });

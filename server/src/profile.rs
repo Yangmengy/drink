@@ -205,6 +205,17 @@ pub async fn record_event(
     user_id: Uuid,
     input: &ProfileEventInput,
 ) -> Result<ProfileEvent, AppError> {
+    let mut transaction = pool.begin().await?;
+    let event = record_event_on(&mut transaction, user_id, input).await?;
+    transaction.commit().await?;
+    Ok(event)
+}
+
+pub async fn record_event_on(
+    connection: &mut PgConnection,
+    user_id: Uuid,
+    input: &ProfileEventInput,
+) -> Result<ProfileEvent, AppError> {
     validate_event_input(input)?;
     let idempotency_key = input
         .idempotency_key
@@ -217,7 +228,6 @@ pub async fn record_event(
         return Err(AppError::bad_request("幂等键最多 200 字"));
     }
 
-    let mut transaction = pool.begin().await?;
     let inserted = sqlx::query_as::<_, ProfileEvent>(
         r#"
         INSERT INTO user_profile_events
@@ -235,10 +245,10 @@ pub async fn record_event(
     .bind(&input.payload)
     .bind(&idempotency_key)
     .bind(&input.trace_id)
-    .fetch_optional(&mut *transaction)
+    .fetch_optional(&mut *connection)
     .await?;
     let event = if let Some(event) = inserted {
-        project_and_save(&mut transaction, user_id).await?;
+        project_and_save(connection, user_id).await?;
         event
     } else {
         sqlx::query_as::<_, ProfileEvent>(
@@ -251,10 +261,9 @@ pub async fn record_event(
         )
         .bind(user_id)
         .bind(&idempotency_key)
-        .fetch_one(&mut *transaction)
+        .fetch_one(&mut *connection)
         .await?
     };
-    transaction.commit().await?;
     Ok(event)
 }
 
@@ -304,6 +313,13 @@ pub async fn projection(pool: &PgPool, user_id: Uuid) -> Result<Projection, AppE
         confidence: serde_json::from_value(existing.confidence)
             .map_err(|_| AppError::internal())?,
     })
+}
+
+pub async fn rebuild_on(
+    connection: &mut PgConnection,
+    user_id: Uuid,
+) -> Result<UserProfile, AppError> {
+    project_and_save(connection, user_id).await
 }
 
 pub async fn rebuild(pool: &PgPool, user_id: Uuid) -> Result<UserProfile, AppError> {

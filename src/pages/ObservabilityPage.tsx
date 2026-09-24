@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, ArrowLeft, Bot, Database, RefreshCw, ShieldCheck, Timer, Wrench } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowLeft, Bot, Brain, Database, FileText, MessagesSquare, RefreshCw, ShieldCheck, Timer, Wrench } from 'lucide-react';
 import { api, errorText } from '../api/client';
 import type { AgentTrace, ObservabilitySnapshot } from '../types';
 import './ObservabilityPage.css';
+import './ObservabilityContext.css';
 
 type StatusFilter = 'all' | 'ok' | 'local' | 'error';
 
@@ -160,6 +161,19 @@ export function ObservabilityPage() {
                 <strong>{formatNumber(snapshot.totals.modelCalls)}</strong>
                 <small>工具 {snapshot.totals.toolCalls} 次</small>
               </article>
+            </section>
+
+            <section className="ops-band" aria-label="上下文摘要状态">
+              <div className="section-heading">
+                <h2>上下文摘要状态</h2>
+                <span>{snapshot.context.status === 'has_summary' ? '已启用滚动摘要' : snapshot.context.status === 'no_summary' ? '有消息但尚无摘要' : '暂无消息'}</span>
+              </div>
+              <div className="ops-context-grid">
+                <article><span><MessagesSquare size={13} />聊天消息</span><strong>{formatNumber(snapshot.context.messagesTotal)}</strong><small>{snapshot.context.usersWithMessages} 个账号</small></article>
+                <article><span><FileText size={13} />Active 摘要</span><strong>{formatNumber(snapshot.context.activeSummaries)}</strong><small>归档 {snapshot.context.archivedSummaries} 条</small></article>
+                <article><span><Brain size={13} />最新覆盖</span><strong>{formatNumber(snapshot.context.latestCoveredMessages)}</strong><small>{snapshot.context.latestTokenEstimate} tokens 估算</small></article>
+                <article><span><Timer size={13} />最近更新</span><strong>{snapshot.context.latestCreatedAt ? formatTime(new Date(snapshot.context.latestCreatedAt).getTime() / 1000) : '—'}</strong><small>{snapshot.context.latestModel} · {snapshot.context.latestPromptVersion}</small></article>
+              </div>
             </section>
 
             <section className="ops-band" aria-label="24 小时趋势">
