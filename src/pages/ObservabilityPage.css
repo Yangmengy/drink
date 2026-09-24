@@ -1,7 +1,7 @@
 /* Agent Ops uses the application palette, but reads as a quiet console. */
 .ops-page {
   min-height: 100dvh;
-  background: var(--bg);
+  background: transparent;
 }
 
 .ops-header {
@@ -30,7 +30,7 @@
 
 .ops-title h1 {
   font-size: 22px;
-  letter-spacing: -0.4px;
+  letter-spacing: 0;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -178,9 +178,11 @@
   min-width: 0;
   padding: 17px 18px 15px;
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 78%, transparent);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--shadow-color) 62%, transparent);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow: 0 18px 38px -28px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
 
 .ops-metrics span {
@@ -197,8 +199,9 @@
   margin-top: 10px;
   color: var(--text);
   font-size: 27px;
-  font-weight: 620;
-  letter-spacing: -0.6px;
+  font-weight: 640;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
   line-height: 1.05;
 }
 
@@ -223,9 +226,11 @@
 .ops-list-panel,
 .ops-detail-panel {
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 78%, transparent);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--shadow-color) 62%, transparent);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  box-shadow: 0 18px 38px -28px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
 
 .ops-band {
@@ -245,7 +250,7 @@
 .detail-heading h2 {
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.2px;
+  letter-spacing: 0;
 }
 
 .section-heading span,

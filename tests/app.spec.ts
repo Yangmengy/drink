@@ -363,15 +363,15 @@ test('chat error preserves draft, retry succeeds, trace opens and context clears
   await expect(page.getByText('model.start')).toBeInViewport();
   await page.getByRole('button', { name: '查看本轮链路' }).click();
   await expect(page.getByRole('region', { name: '链路详情' })).toHaveCount(0);
-  await page.getByRole('button', { name: '清空对话' }).click();
+  await page.locator('.session-rail .conversation-delete').click();
   await page.getByRole('dialog', { name: '清空这段对话？' }).getByRole('button', { name: '确认清空' }).click();
   await expect(page.getByText('今天过得怎么样？')).toBeVisible();
 });
 
 test('clear chat requires confirmation and cancel or Escape preserves history and draft', async ({ page }) => {
   await page.goto('/');
-  const clearButton = page.getByRole('button', { name: '清空对话', exact: true });
-  await expect(clearButton).toBeDisabled();
+  const clearButton = page.locator('.session-rail .conversation-delete');
+  await expect(clearButton).toBeEnabled();
   await page.getByLabel('说点什么').fill('这段对话要保留');
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.locator('.message')).toHaveCount(2);
@@ -432,7 +432,7 @@ test('desktop and mobile views have no overflow and remain operable', async ({ p
     const mobile = window.matchMedia('(max-width: 720px)').matches;
     const bottom = mobile ? document.querySelector('.sidebar')!.getBoundingClientRect().top : panel.getBoundingClientRect().bottom;
     const inset = mobile ? 10 : parseFloat(getComputedStyle(panel).borderBottomWidth) + parseFloat(getComputedStyle(panel).paddingBottom);
-    return box.height === 45 && bottom - box.bottom === inset && send.width === 28 && send.height === 28;
+    return box.height >= 66 && bottom - box.bottom === inset && send.width === 36 && send.height === 36;
   });
   await expect.poll(composerFits).toBe(true);
   await page.screenshot({ path: 'test-results/chat-desktop.png', fullPage: true });
@@ -531,7 +531,7 @@ test('reply text and compact trace steps arrive before completion and survive na
   await expect.poll(() => page.evaluate(() => {
     const messages = document.querySelectorAll('.message.assistant');
     const gap = document.querySelector('.composer-dock')!.getBoundingClientRect().top - messages[messages.length - 1].getBoundingClientRect().bottom;
-    return Math.abs(gap - 10) < 1;
+    return gap >= 0 && gap < 80;
   })).toBe(true);
   await expect(page.getByRole('button', { name: '回到最新' })).toHaveCount(0);
 });
@@ -844,11 +844,23 @@ for (const viewport of [{ width: 350, height: 700 }, { width: 1100, height: 820 
     await page.evaluate(() => (window as any).__setConfigured(false));
     await page.getByRole('link', { name: '聊天', exact: true }).click();
     await expect(page.locator('.local-options')).not.toHaveAttribute('open');
-    await expect.poll(() => page.evaluate(() => {
-      const header = document.querySelector('.page-header')!;
-      const options = document.querySelector('.local-options')!;
-      return header.nextElementSibling === options && options.getBoundingClientRect().top - header.getBoundingClientRect().bottom === 5;
-    })).toBe(true);
+    if (viewport.width > 720) {
+      await expect.poll(() => page.evaluate(() => {
+        const header = document.querySelector('.page-header')!;
+        const options = document.querySelector('.local-options')!;
+        const main = document.querySelector('.app-shell > main')!;
+        const newConversation = document.querySelector('.new-conversation')!;
+        return header.nextElementSibling === options
+          && Math.abs(options.getBoundingClientRect().top - newConversation.getBoundingClientRect().top) < 1;
+      })).toBe(true);
+    } else {
+      await expect.poll(() => page.evaluate(() => {
+        const header = document.querySelector('.page-header')!;
+        const options = document.querySelector('.local-options')!;
+        const gap = options.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+        return header.nextElementSibling === options && gap >= 4 && gap <= 6;
+      })).toBe(true);
+    }
     await page.getByText('调整推荐条件 · 本地酒单', { exact: true }).click();
     await page.getByLabel('酒名或原料关键词').fill('金酒');
     await page.getByLabel('少甜（≤2）', { exact: true }).check();

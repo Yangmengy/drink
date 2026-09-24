@@ -1,4 +1,4 @@
-import { Sunrise, Sun, Sunset, MoonStar, type LucideIcon } from 'lucide-react';
+import { Trees, Snowflake, Home, type LucideIcon } from 'lucide-react';
 
 export interface Theme {
   id: string;
@@ -8,10 +8,9 @@ export interface Theme {
 }
 
 export const themes: Theme[] = [
-  { id: 'morning', name: '清晨', hint: '薄雾与绿叶', icon: Sunrise },
-  { id: 'afternoon', name: '午后', hint: '暖纸与陶土', icon: Sun },
-  { id: 'dusk', name: '薄暮', hint: '安静的灰粉', icon: Sunset },
-  { id: 'night', name: '夜话', hint: '灯下低语', icon: MoonStar },
+  { id: 'rain', name: '林间', hint: '树屋与夜色', icon: Trees },
+  { id: 'snow', name: '雪夜', hint: '月下小屋', icon: Snowflake },
+  { id: 'cottage', name: '乡居', hint: '暖阳与野花', icon: Home },
 ];
 
 const STORAGE_KEY = 'bartender-theme';
@@ -21,7 +20,7 @@ export function resolveInitialTheme(): string {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && themes.some(t => t.id === saved)) return saved;
   } catch { /* localStorage unavailable */ }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'night' : 'morning';
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'snow' : 'rain';
 }
 
 // Called once at module scope in main.tsx, before first paint.

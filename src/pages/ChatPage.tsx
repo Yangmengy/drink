@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowDown, ArrowUp, MessageCircle, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, MessageCircle, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useChat } from '../components/ChatContext';
 import { useBar } from '../components/BarContext';
@@ -16,7 +16,7 @@ import '../styles/chat-reply.css';
 const suggestions = ['今天想随便聊聊', '用我现有的材料，做一杯不太甜的酒', '有点累，陪我待一会儿'];
 
 export function ChatPage() {
-  const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, pendingMode, configured, setConfigured, recommendLocal, localError, liveReply } = useChat();
+  const { messages, pending, loading, clearing, error, draft, setDraft, failed, send, pendingMode, configured, setConfigured, recommendLocal, localError, liveReply, newConversationRequested, consumeNewConversationRequest } = useChat();
   const bar = useBar();
   const [atBottom, setAtBottom] = useState(true);
   const followLatest = useRef(true);
@@ -26,6 +26,7 @@ export function ChatPage() {
   const didInitScroll = useRef(false);
   const [localOpen, setLocalOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [localNoticeOpen, setLocalNoticeOpen] = useState(true);
   // 远端失败后，用户转用本地推荐时记录插入点；本地结果出现后，失败框留在原位。
   const [failedTurnAnchor, setFailedTurnAnchor] = useState<number | null>(null);
   const chatTop = useRef<HTMLDivElement>(null);
@@ -33,6 +34,12 @@ export function ChatPage() {
   const latestTurn = useRef<HTMLElement>(null);
   const awaitingLocalReply = useRef(false);
   const failedTrace = errorTraceId(error);
+  useLayoutEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 126)}px`;
+  }, [draft]);
   useEffect(() => {
     let active = true;
     api.settings().then(s => { if (active) setConfigured(s.apiKeyConfigured); }).catch(() => { if (active) setConfigured(null); });
@@ -42,6 +49,12 @@ export function ChatPage() {
   useEffect(() => {
     if (!messages.length) setFailedTurnAnchor(null);
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!newConversationRequested || clearOpen) return;
+    setClearOpen(true);
+    consumeNewConversationRequest();
+  }, [clearOpen, consumeNewConversationRequest, newConversationRequested]);
 
   const isDesktopChat = () => window.matchMedia('(min-width: 1000px)').matches;
   const currentScrollY = () => (isDesktopChat() ? conversation.current?.scrollTop ?? 0 : window.scrollY);
@@ -213,7 +226,19 @@ export function ChatPage() {
           <LocalRecommendations onSearch={input => void searchLocal(input)} />
         </details>
       </div>
-      {configured === false && <div className="notice local-mode" role="status"><strong>本地模式</strong><p>尚未配置 API，暂时无法智能陪聊。酒柜和本地推荐可以正常使用。<Link to="/settings">配置聊天模型</Link></p></div>}
+      {configured === false && localNoticeOpen && (
+        <div className="notice local-mode" role="status">
+          <span className="local-mode-dot" aria-hidden="true" />
+          <span className="local-mode-copy">
+            <strong>本地模式</strong>
+            <span className="local-mode-message">尚未配置 API，暂时无法智能陪聊。酒柜和本地推荐可以正常使用。</span>
+            <Link to="/settings">配置聊天模型</Link>
+          </span>
+          <button className="local-mode-close" aria-label="关闭本地模式提示" onClick={() => setLocalNoticeOpen(false)}>
+            <X size={15} strokeWidth={2} />
+          </button>
+        </div>
+      )}
       <div className="conversation" ref={conversation} role="log" aria-label="聊天记录" aria-live="polite">
         {!loading && !messages.length && !pending && !failed && !error && (
           <div className={`welcome ${configured === false ? 'local-welcome' : ''}`}>

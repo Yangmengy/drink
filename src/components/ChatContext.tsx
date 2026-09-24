@@ -9,6 +9,9 @@ interface ChatState {
   localError: string; pendingMode: 'agent' | 'local';
   configured: boolean | null; setConfigured: (value: boolean | null) => void;
   liveReply: LiveReply;
+  newConversationRequested: boolean;
+  requestNewConversation: () => void;
+  consumeNewConversationRequest: () => void;
 }
 const emptyLiveReply: LiveReply = { traceId: null, text: '', events: [] };
 const Context = createContext<ChatState | null>(null);
@@ -24,6 +27,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [pendingMode, setPendingMode] = useState<'agent' | 'local'>('agent');
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [liveReply, setLiveReply] = useState<LiveReply>(emptyLiveReply);
+  const [newConversationRequested, setNewConversationRequested] = useState(false);
   const streamRevision = useRef(0);
   const busy = useRef(false);
   const draftRevision = useRef(0);
@@ -80,6 +84,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try { await api.clear(); setMessages([]); setFailed(''); setLocalError(''); return true; } catch (e) { setError(errorText(e)); return false; }
     finally { busy.current = false; setClearing(false); }
   };
-  return <Context.Provider value={{ messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear, recommendLocal, localError, pendingMode, configured, setConfigured, liveReply }}>{children}</Context.Provider>;
+  return <Context.Provider value={{
+    messages, pending, loading, clearing, error, draft, setDraft, failed, send, clear, recommendLocal,
+    localError, pendingMode, configured, setConfigured, liveReply, newConversationRequested,
+    requestNewConversation: () => setNewConversationRequested(true),
+    consumeNewConversationRequest: () => setNewConversationRequested(false),
+  }}>{children}</Context.Provider>;
 }
 export function useChat() { const value = useContext(Context); if (!value) throw new Error('ChatProvider missing'); return value; }
