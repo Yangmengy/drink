@@ -59,6 +59,12 @@ export interface ObservabilityContext {
 }
 export interface Settings { name: string; preferences: string; model: string; baseUrl: string; apiKeyConfigured: boolean; dataDirectory: string }
 export interface SettingsInput { name: string; preferences: string; model: string; baseUrl: string; apiKey: string | null }
+export interface Conversation {
+  id: string; title: string; status: 'active' | 'archived';
+  messageCount: number; lastMessagePreview: string | null;
+  lastMessageAt: string | null; createdAt: string; isActive: boolean;
+}
+export interface CreateConversationInput { title?: string; idempotencyKey?: string }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; text: string; recipes: Recipe[]; traceId?: string | null; mode?: 'agent' | 'local' }
 export interface LocalRecommendationInput {
   availability: 'ready' | 'missingOne' | 'any';

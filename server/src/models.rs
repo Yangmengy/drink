@@ -197,6 +197,8 @@ pub struct MemoryListQuery {
 pub struct ContextMaintainInput {
     #[serde(default)]
     pub api_key: Option<String>,
+    #[serde(default)]
+    pub conversation_id: Option<Uuid>,
 }
 
 #[derive(Debug, Serialize)]
@@ -234,6 +236,31 @@ pub struct ChatSendInput {
     pub message: String,
     #[serde(default)]
     pub api_key: Option<String>,
+    #[serde(default)]
+    pub conversation_id: Option<Uuid>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearChatInput {
+    #[serde(default)]
+    pub conversation_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceListQuery {
+    #[serde(default)]
+    pub conversation_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateConversationInput {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub idempotency_key: Option<String>,
 }
 
 #[derive(Debug, Clone)]

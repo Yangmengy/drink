@@ -2,6 +2,7 @@ pub mod agent;
 pub mod agent_runner;
 pub mod auth;
 pub mod context;
+pub mod conversation;
 pub mod error;
 pub mod local;
 pub mod memory;

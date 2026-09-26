@@ -1,5 +1,5 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot, ContextMaintainResult, ProfileEvent, ProfileEventInput, UserProfile, MemoryStatement, MemoryStatementInput, MemorySettings } from '../types';
+import type { Ingredient, NewIngredientInput, AddIngredientResult, Recipe, RecipeInput, Settings, SettingsInput, ChatMessage, AgentTrace, LocalRecommendationInput, LocalRecommendationResult, ChatStreamEvent, ObservabilitySnapshot, ContextMaintainResult, ProfileEvent, ProfileEventInput, UserProfile, MemoryStatement, MemoryStatementInput, MemorySettings, Conversation, CreateConversationInput } from '../types';
 import { desktopSnapshot } from '../lib/observability';
 export const isNative = () => '__TAURI_INTERNALS__' in window;
 
@@ -102,21 +102,35 @@ export const api = {
     },
     { input },
   ),
+  conversations: () => {
+    if (isNative()) return Promise.reject(new Error('会话目录当前支持 Web 登录账号。'));
+    return http<Conversation[]>('/conversations');
+  },
+  createConversation: (input: CreateConversationInput = {}) => {
+    if (isNative()) return Promise.reject(new Error('会话目录当前支持 Web 登录账号。'));
+    return http<Conversation>('/conversations', { method: 'POST', body: JSON.stringify(input) });
+  },
+  conversationMessages: (id: string) => {
+    if (isNative()) return Promise.reject(new Error('会话目录当前支持 Web 登录账号。'));
+    return http<ChatMessage[]>(`/conversations/${encodeURIComponent(id)}/chat`);
+  },
+  activateConversation: (id: string) => http<void>(`/conversations/${encodeURIComponent(id)}/active`, { method: 'POST' }),
+  deleteConversation: (id: string) => http<string>(`/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  clear: (conversationId?: string) => webOrNative<void>('clear_chat_history', () => http<void>('/chat', { method: 'DELETE', body: JSON.stringify({ conversationId }) })),
   history: () => webOrNative<ChatMessage[]>('get_chat_history', () => http<ChatMessage[]>('/chat')),
-  send: (message: string, onEvent?: (event: ChatStreamEvent) => void) => {
+  send: (message: string, conversationId?: string, onEvent?: (event: ChatStreamEvent) => void) => {
     if (isNative()) return streamCall<ChatMessage>('send_chat_message', { message }, onEvent);
     const modelKey = getModelKey();
     if (!modelKey) return localChatReply(message);
-    return http<ChatMessage>('/chat/send', { method: 'POST', body: JSON.stringify({ message, apiKey: modelKey }) });
+    return http<ChatMessage>('/chat/send', { method: 'POST', body: JSON.stringify({ message, apiKey: modelKey, conversationId }) });
   },
   recommendLocal: (input: LocalRecommendationInput, onEvent?: (event: ChatStreamEvent) => void) => isNative()
     ? streamCall<LocalRecommendationResult>('recommend_local', { input }, onEvent)
     : http<LocalRecommendationResult>('/recommendations/local', { method: 'POST', body: JSON.stringify(input) }),
-  clear: () => webOrNative<void>('clear_chat_history', () => http<void>('/chat', { method: 'DELETE' })),
-  maintainContext: async (): Promise<ContextMaintainResult> => {
+  maintainContext: async (conversationId?: string): Promise<ContextMaintainResult> => {
     const modelKey = getModelKey();
     if (!modelKey) return { maintained: false, reason: 'missing_api_key', summaryId: null, coveredMessages: 0, tokenEstimate: 0 };
-    return http<ContextMaintainResult>('/context/maintain', { method: 'POST', body: JSON.stringify({ apiKey: modelKey }) });
+    return http<ContextMaintainResult>('/context/maintain', { method: 'POST', body: JSON.stringify({ apiKey: modelKey, conversationId }) });
   },
   profile: async (): Promise<UserProfile | null> => {
     if (isNative()) return null;
@@ -153,7 +167,7 @@ export const api = {
     if (isNative()) return Promise.reject(new Error('画像反馈目前支持 Web 登录账号。'));
     return http<ProfileEvent>('/profile/events', { method: 'POST', body: JSON.stringify(input) });
   },
-  traces: () => webOrNative<AgentTrace[]>('list_agent_traces', () => http<AgentTrace[]>('/traces')),
+  traces: (conversationId?: string) => webOrNative<AgentTrace[]>('list_agent_traces', () => http<AgentTrace[]>(`/traces${conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''}`)),
   observability: async (): Promise<ObservabilitySnapshot> => {
     if (isNative()) return desktopSnapshot(await api.traces());
     return http<ObservabilitySnapshot>('/observability/summary');

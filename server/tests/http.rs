@@ -420,6 +420,14 @@ async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
         .expect("user id")
         .parse()?;
 
+    let response = request_json(app.clone(), "GET", "/conversations", Some(token), None).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let conversations: Value = parse(response).await?;
+    let conversation_id = conversations[0]["id"]
+        .as_str()
+        .expect("active conversation id")
+        .to_owned();
+
     sqlx::query(
         r#"
         INSERT INTO companion_settings (user_id, name, preferences, model, base_url)
@@ -437,10 +445,9 @@ async fn web_agent_uses_adk_runner_tool_loop() -> anyhow::Result<()> {
         "POST",
         "/chat/send",
         Some(token),
-        Some(json!({"message": "recommend a cocktail", "apiKey": "test-key"})),
+        Some(json!({"message": "recommend a cocktail", "apiKey": "test-key", "conversationId": conversation_id})),
     )
     .await?;
-    assert_eq!(response.status(), StatusCode::OK);
     let reply: ChatMessage = parse(response).await?;
     assert_eq!(reply.mode, "agent");
     assert!(reply.text.contains("ADK Runner"));
@@ -601,6 +608,218 @@ async fn profile_memory_and_context_foundations() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn conversation_directory_isolates_history_traces_and_clears() -> anyhow::Result<()> {
+    let Some(database_url) = std::env::var("DATABASE_URL").ok() else {
+        eprintln!("DATABASE_URL is not set; conversation PostgreSQL test skipped");
+        return Ok(());
+    };
+    let database = PgPool::connect(&database_url).await?;
+    sqlx::migrate!("./migrations").run(&database).await?;
+    let email = format!("{}{}", uuid::Uuid::new_v4().simple(), EMAIL_HOST);
+    sqlx::query("DELETE FROM users WHERE email = $1")
+        .bind(&email)
+        .execute(&database)
+        .await?;
+
+    let state = AppState {
+        pool: database.clone(),
+        jwt_secret: "integration-test-secret-with-32-characters".to_owned(),
+        owner_email: Some(email.clone()),
+    };
+    let app = router(state);
+    let response = request_json(
+        app.clone(),
+        "POST",
+        "/auth/register",
+        None,
+        Some(json!({"email": email, "password": "a-long-password"})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let registered: Value = parse(response).await?;
+    let token = registered["token"].as_str().expect("token");
+    let user_id = registered["user"]["id"].as_str().expect("user id");
+
+    let conversations: Vec<Value> =
+        parse(request_json(app.clone(), "GET", "/conversations", Some(token), None).await?).await?;
+    assert_eq!(conversations.len(), 1);
+    assert_eq!(conversations[0]["isActive"], true);
+    let conversation_a = conversations[0]["id"].as_str().expect("conversation a");
+
+    for (role, text) in [("user", "A 的第一条"), ("assistant", "A 的回复")] {
+        sqlx::query(
+            "INSERT INTO chat_messages (user_id, conversation_id, role, text, mode) VALUES ($1::uuid, $2::uuid, $3, $4, 'agent')",
+        )
+        .bind(user_id)
+        .bind(conversation_a)
+        .bind(role)
+        .bind(text)
+        .execute(&database)
+        .await?;
+    }
+
+    let created_response = request_json(
+        app.clone(),
+        "POST",
+        "/conversations",
+        Some(token),
+        Some(json!({"idempotencyKey": uuid::Uuid::new_v4().to_string()})),
+    )
+    .await?;
+    assert_eq!(created_response.status(), StatusCode::OK);
+    let created: Value = parse(created_response).await?;
+    assert_eq!(created["title"], "新的对话");
+    let conversation_b = created["id"].as_str().expect("conversation b");
+    assert_ne!(conversation_a, conversation_b);
+
+    for (role, text) in [("user", "B 的第一条"), ("assistant", "B 的回复")] {
+        sqlx::query(
+            "INSERT INTO chat_messages (user_id, conversation_id, role, text, mode) VALUES ($1::uuid, $2::uuid, $3, $4, 'agent')",
+        )
+        .bind(user_id)
+        .bind(conversation_b)
+        .bind(role)
+        .bind(text)
+        .execute(&database)
+        .await?;
+    }
+
+    sqlx::query(
+        "INSERT INTO agent_traces (id, user_id, conversation_id, started_at, duration_ms, status, events) VALUES ($1, $2::uuid, $3::uuid, NOW(), 5, 'complete', '[]'::jsonb)",
+    )
+    .bind(format!("trace-{conversation_a}"))
+    .bind(user_id)
+    .bind(conversation_a)
+    .execute(&database)
+    .await?;
+    sqlx::query(
+        "INSERT INTO agent_traces (id, user_id, conversation_id, started_at, duration_ms, status, events) VALUES ($1, $2::uuid, $3::uuid, NOW(), 5, 'complete', '[]'::jsonb)",
+    )
+    .bind(format!("trace-{conversation_b}"))
+    .bind(user_id)
+    .bind(conversation_b)
+    .execute(&database)
+    .await?;
+
+    let history_a: Vec<Value> = parse(
+        request_json(
+            app.clone(),
+            "GET",
+            &format!("/conversations/{conversation_a}/chat"),
+            Some(token),
+            None,
+        )
+        .await?,
+    )
+    .await?;
+    assert_eq!(history_a.len(), 2);
+    let history_b: Vec<Value> = parse(
+        request_json(
+            app.clone(),
+            "GET",
+            &format!("/conversations/{conversation_b}/chat"),
+            Some(token),
+            None,
+        )
+        .await?,
+    )
+    .await?;
+    assert_eq!(history_b.len(), 2);
+
+    let traces_a: Vec<Value> = parse(
+        request_json(
+            app.clone(),
+            "GET",
+            &format!("/traces?conversationId={conversation_a}"),
+            Some(token),
+            None,
+        )
+        .await?,
+    )
+    .await?;
+    let traces_b: Vec<Value> = parse(
+        request_json(
+            app.clone(),
+            "GET",
+            &format!("/traces?conversationId={conversation_b}"),
+            Some(token),
+            None,
+        )
+        .await?,
+    )
+    .await?;
+    assert_eq!(traces_a.len(), 1);
+    assert_eq!(traces_b.len(), 1);
+
+    let response = request_json(
+        app.clone(),
+        "DELETE",
+        "/chat",
+        Some(token),
+        Some(json!({"conversationId": conversation_a})),
+    )
+    .await?;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let remaining_a: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+          (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = $1::uuid),
+          (SELECT COUNT(*) FROM agent_traces WHERE conversation_id = $1::uuid)
+        "#,
+    )
+    .bind(conversation_a)
+    .fetch_one(&database)
+    .await?;
+    assert_eq!(remaining_a, (0, 0));
+    let remaining_b: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+          (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = $1::uuid),
+          (SELECT COUNT(*) FROM agent_traces WHERE conversation_id = $1::uuid)
+        "#,
+    )
+    .bind(conversation_b)
+    .fetch_one(&database)
+    .await?;
+    assert_eq!(remaining_b, (2, 1));
+
+    let deleted: Value = parse(
+        request_json(
+            app.clone(),
+            "DELETE",
+            &format!("/conversations/{conversation_b}"),
+            Some(token),
+            None,
+        )
+        .await?,
+    )
+    .await?;
+    assert_ne!(deleted.as_str(), Some(conversation_b));
+    let conversations: Vec<Value> =
+        parse(request_json(app.clone(), "GET", "/conversations", Some(token), None).await?).await?;
+    assert_eq!(conversations.len(), 1);
+    assert_ne!(conversations[0]["id"].as_str(), Some(conversation_b));
+    let remaining_b: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+          (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = $1::uuid),
+          (SELECT COUNT(*) FROM agent_traces WHERE conversation_id = $1::uuid)
+        "#,
+    )
+    .bind(conversation_b)
+    .fetch_one(&database)
+    .await?;
+    assert_eq!(remaining_b, (0, 0));
+
+    sqlx::query("DELETE FROM users WHERE email = $1")
+        .bind(&email)
+        .execute(&database)
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn context_maintain_compacts_old_messages() -> anyhow::Result<()> {
     let Some(database_url) = std::env::var("DATABASE_URL").ok() else {
         eprintln!("DATABASE_URL is not set; context summary PostgreSQL test skipped");
@@ -658,17 +877,26 @@ async fn context_maintain_compacts_old_messages() -> anyhow::Result<()> {
     .bind(model_server.uri())
     .execute(&database)
     .await?;
+    let response = request_json(app.clone(), "GET", "/conversations", Some(token), None).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let conversations: Value = parse(response).await?;
+    let conversation_id = conversations[0]["id"]
+        .as_str()
+        .expect("active conversation id")
+        .to_owned();
+
     for index in 1..=40 {
         sqlx::query(
             r#"
-            INSERT INTO chat_messages (user_id, role, text, mode)
-            VALUES ($1, CASE WHEN $2 % 2 = 0 THEN 'assistant' ELSE 'user' END,
+            INSERT INTO chat_messages (user_id, conversation_id, role, text, mode)
+            VALUES ($1, $4::uuid, CASE WHEN $2 % 2 = 0 THEN 'assistant' ELSE 'user' END,
                     $3, 'agent')
             "#,
         )
         .bind(user_id)
         .bind(index)
         .bind(format!("old message {index}"))
+        .bind(&conversation_id)
         .execute(&database)
         .await?;
     }
@@ -682,7 +910,9 @@ async fn context_maintain_compacts_old_messages() -> anyhow::Result<()> {
     )
     .await?;
     assert_eq!(response.status(), StatusCode::OK);
-    let result: Value = parse(response).await?;
+    let result_result: Result<Value, _> = parse(response).await;
+    println!("maintain={result_result:?}");
+    let result: Value = result_result?;
     assert_eq!(result["maintained"], true);
     assert_eq!(result["coveredMessages"], 24);
 

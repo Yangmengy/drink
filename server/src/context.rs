@@ -16,6 +16,8 @@ const MAX_CANDIDATE_MESSAGES: usize = 120;
 #[serde(rename_all = "camelCase")]
 pub struct ContextSummary {
     pub id: Uuid,
+    #[allow(dead_code)]
+    pub conversation_id: Uuid,
     pub from_seq: Option<i64>,
     pub to_seq: Option<i64>,
     pub summary: String,
@@ -27,6 +29,7 @@ pub struct ContextSummary {
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct ContextState {
+    #[allow(dead_code)]
     active_summary_id: Option<Uuid>,
     last_summarized_message_id: Option<Uuid>,
     recent_window: i32,
@@ -55,6 +58,7 @@ struct ModelSummary {
 pub async fn maintain(
     pool: &PgPool,
     user_id: Uuid,
+    conversation_id: Uuid,
     settings: &Settings,
     input: &ContextMaintainInput,
 ) -> Result<ContextMaintainResponse, AppError> {
@@ -69,12 +73,11 @@ pub async fn maintain(
         });
     }
 
-    let state = ensure_state(pool, user_id).await?;
-    let prior_summary = active_summary(pool, user_id).await?;
-    let prior_state = state.clone();
+    let state = ensure_state(pool, conversation_id).await?;
+    let prior_summary = active_summary(pool, conversation_id).await?;
     let candidates = pending_candidates(
         pool,
-        user_id,
+        conversation_id,
         state.recent_window,
         state.last_summarized_message_id,
     )
@@ -107,42 +110,37 @@ pub async fn maintain(
         .unwrap_or(candidates.len() as i32);
 
     let mut transaction = pool.begin().await?;
-    let current = ensure_state_on(&mut transaction, user_id).await?;
-    if current.active_summary_id != prior_state.active_summary_id
-        || current.last_summarized_message_id != prior_state.last_summarized_message_id
-    {
-        return Ok(ContextMaintainResponse {
-            maintained: false,
-            reason: Some("context_changed".to_owned()),
-            summary_id: None,
-            covered_messages: 0,
-            token_estimate: 0,
-        });
-    }
+    let current = ensure_state_on(&mut transaction, conversation_id, user_id).await?;
+    let _ = current;
 
     let summary_id = Uuid::new_v4();
     sqlx::query(
         r#"
         UPDATE chat_context_summaries
         SET status = 'archived'
-        WHERE user_id = $1 AND status = 'active'
+        WHERE conversation_id = $1 AND status = 'active'
         "#,
     )
-    .bind(user_id)
+    .bind(conversation_id)
     .execute(&mut *transaction)
-    .await?;
+    .await
+    .map_err(|e| {
+        eprintln!("archive failed: {e:?}");
+        e
+    })?;
 
     sqlx::query(
         r#"
         INSERT INTO chat_context_summaries
-            (id, user_id, from_message_id, to_message_id, from_seq, to_seq,
+            (id, user_id, conversation_id, from_message_id, to_message_id, from_seq, to_seq,
              summary, covered_message_count, token_estimate, model,
              prompt_version, source, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'model', 'active')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'model', 'active')
         "#,
     )
     .bind(summary_id)
     .bind(user_id)
+    .bind(conversation_id)
     .bind(from_message.id)
     .bind(to_message.id)
     .bind(from_seq)
@@ -153,7 +151,11 @@ pub async fn maintain(
     .bind(&settings.model)
     .bind(SUMMARY_PROMPT_VERSION)
     .execute(&mut *transaction)
-    .await?;
+    .await
+    .map_err(|e| {
+        eprintln!("summary insert failed: {e:?}");
+        e
+    })?;
 
     let updated = sqlx::query(
         r#"
@@ -161,18 +163,18 @@ pub async fn maintain(
         SET last_summarized_message_id = $2,
             active_summary_id = $3,
             updated_at = NOW()
-        WHERE user_id = $1
-          AND active_summary_id IS NOT DISTINCT FROM $4
-          AND last_summarized_message_id IS NOT DISTINCT FROM $5
+        WHERE conversation_id = $1
         "#,
     )
-    .bind(user_id)
+    .bind(conversation_id)
     .bind(to_message.id)
     .bind(summary_id)
-    .bind(prior_state.active_summary_id)
-    .bind(prior_state.last_summarized_message_id)
     .execute(&mut *transaction)
-    .await?;
+    .await
+    .map_err(|e| {
+        eprintln!("state update failed: {e:?}");
+        e
+    })?;
     if updated.rows_affected() == 0 {
         transaction.rollback().await?;
         return Ok(ContextMaintainResponse {
@@ -194,28 +196,37 @@ pub async fn maintain(
     })
 }
 
-pub async fn active_summary_text(pool: &PgPool, user_id: Uuid) -> Result<Option<String>, AppError> {
-    let summary = active_summary(pool, user_id).await?;
+pub async fn active_summary_text(
+    pool: &PgPool,
+    conversation_id: Uuid,
+) -> Result<Option<String>, AppError> {
+    let summary = active_summary(pool, conversation_id).await?;
     Ok(summary.map(|summary| summary.summary))
 }
 
-async fn ensure_state(pool: &PgPool, user_id: Uuid) -> Result<ContextState, AppError> {
+async fn ensure_state(pool: &PgPool, conversation_id: Uuid) -> Result<ContextState, AppError> {
     let mut connection = pool.acquire().await?;
-    ensure_state_on(&mut connection, user_id).await
+    let user_id = sqlx::query_scalar::<_, Uuid>("SELECT user_id FROM conversations WHERE id = $1")
+        .bind(conversation_id)
+        .fetch_one(&mut *connection)
+        .await?;
+    ensure_state_on(&mut connection, conversation_id, user_id).await
 }
 
 async fn ensure_state_on(
     connection: &mut sqlx::PgConnection,
+    conversation_id: Uuid,
     user_id: Uuid,
 ) -> Result<ContextState, AppError> {
     sqlx::query(
         r#"
-        INSERT INTO chat_context_state (user_id)
-        VALUES ($1)
+        INSERT INTO chat_context_state (user_id, conversation_id)
+        VALUES ($1, $2)
         ON CONFLICT (user_id) DO NOTHING
         "#,
     )
     .bind(user_id)
+    .bind(conversation_id)
     .execute(&mut *connection)
     .await?;
 
@@ -223,10 +234,10 @@ async fn ensure_state_on(
         r#"
         SELECT s.active_summary_id, s.last_summarized_message_id, s.recent_window
         FROM chat_context_state s
-        WHERE s.user_id = $1
+        WHERE s.conversation_id = $1
         "#,
     )
-    .bind(user_id)
+    .bind(conversation_id)
     .fetch_one(&mut *connection)
     .await
     .map_err(Into::into)
@@ -236,9 +247,9 @@ async fn active_summary(pool: &PgPool, user_id: Uuid) -> Result<Option<ContextSu
     sqlx::query_as::<_, ContextSummary>(
         r#"
         SELECT id, from_seq, to_seq, summary, covered_message_count,
-               token_estimate, status, created_at
+               token_estimate, status, created_at, conversation_id
         FROM chat_context_summaries
-        WHERE user_id = $1 AND status = 'active'
+        WHERE conversation_id = $1 AND status = 'active'
         ORDER BY created_at DESC, id DESC
         LIMIT 1
         "#,
@@ -251,7 +262,7 @@ async fn active_summary(pool: &PgPool, user_id: Uuid) -> Result<Option<ContextSu
 
 async fn pending_candidates(
     pool: &PgPool,
-    user_id: Uuid,
+    conversation_id: Uuid,
     recent_window: i32,
     last_summarized_message_id: Option<Uuid>,
 ) -> Result<Vec<SummaryCandidate>, AppError> {
@@ -260,16 +271,16 @@ async fn pending_candidates(
         WITH recent AS (
             SELECT id
             FROM chat_messages
-            WHERE user_id = $1
+            WHERE conversation_id = $1
             ORDER BY seq DESC
             LIMIT $2
         )
         SELECT m.id, m.seq, m.role, m.text
         FROM chat_messages m
-        LEFT JOIN chat_context_state s ON s.user_id = m.user_id
+        LEFT JOIN chat_context_state s ON s.conversation_id = m.conversation_id
         LEFT JOIN chat_messages last_summarized
             ON last_summarized.id = s.last_summarized_message_id
-        WHERE m.user_id = $1
+        WHERE m.conversation_id = $1
           AND NOT EXISTS (SELECT 1 FROM recent WHERE recent.id = m.id)
           AND (
               $3::UUID IS NULL
@@ -280,7 +291,7 @@ async fn pending_candidates(
         LIMIT $4
         "#,
     )
-    .bind(user_id)
+    .bind(conversation_id)
     .bind(recent_window)
     .bind(last_summarized_message_id)
     .bind(MAX_CANDIDATE_MESSAGES as i64)

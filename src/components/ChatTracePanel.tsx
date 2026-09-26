@@ -6,20 +6,16 @@ import './ChatTracePanel.css';
 
 interface ChatTracePanelProps {
   traceId?: string | null;
+  conversationId?: string | null;
   liveEvents?: TraceEvent[];
   label?: string;
 }
 
-let inFlightTraces: Promise<AgentTrace[]> | null = null;
-
-function loadTraces() {
-  if (!inFlightTraces) {
-    inFlightTraces = api.traces().finally(() => { inFlightTraces = null; });
-  }
-  return inFlightTraces;
+function loadTraces(conversationId?: string | null) {
+  return api.traces(conversationId ?? undefined);
 }
 
-export function ChatTracePanel({ traceId, liveEvents, label = '查看本轮链路' }: ChatTracePanelProps) {
+export function ChatTracePanel({ traceId, conversationId, liveEvents, label = '查看本轮链路' }: ChatTracePanelProps) {
   const contentId = useId();
   const [manualOpen, setManualOpen] = useState<boolean | null>(null);
   const [traces, setTraces] = useState<AgentTrace[]>([]);
@@ -37,12 +33,12 @@ export function ChatTracePanel({ traceId, liveEvents, label = '查看本轮链�
     let active = true;
     setLoading(true);
     setError('');
-    loadTraces()
+    loadTraces(conversationId)
       .then(result => { if (active) setTraces(result); })
       .catch(reason => { if (active) setError(errorText(reason)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [traceId, isLive, reload]);
+  }, [traceId, conversationId, isLive, reload]);
 
   const trace = traces.find(item => item.id === traceId);
   const events = liveEvents ?? trace?.events ?? [];

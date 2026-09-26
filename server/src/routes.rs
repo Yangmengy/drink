@@ -1,3 +1,4 @@
+use crate::conversation;
 use crate::{
     agent,
     auth::{self, login, register, CurrentUser, OwnerUser},
@@ -7,6 +8,7 @@ use crate::{
     state::AppState,
 };
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, patch, post},
@@ -37,6 +39,13 @@ pub fn api() -> Router<AppState> {
         .route("/recipes", get(search_recipes).post(save_recipe))
         .route("/recipes/{id}", get(get_recipe).delete(delete_recipe))
         .route("/recommendations/local", post(recommend_local))
+        .route(
+            "/conversations",
+            get(list_conversations).post(create_conversation),
+        )
+        .route("/conversations/{id}/chat", get(conversation_chat))
+        .route("/conversations/{id}/active", post(activate_conversation))
+        .route("/conversations/{id}", delete(delete_conversation))
         .route("/profile", get(get_profile).post(rebuild_profile))
         .route("/profile/events", post(create_profile_event))
         .route(
@@ -149,14 +158,29 @@ async fn chat_history(
     State(state): State<AppState>,
     user: CurrentUser,
 ) -> Result<Json<Vec<ChatMessage>>, crate::error::AppError> {
-    Ok(Json(agent::history(&state.pool, user.id).await?))
+    let conversation_id = conversation::active_id(&state.pool, user.id).await?;
+    Ok(Json(
+        agent::history(&state.pool, user.id, conversation_id).await?,
+    ))
 }
 
 async fn clear_chat(
     State(state): State<AppState>,
     user: CurrentUser,
+    body: Bytes,
 ) -> Result<StatusCode, crate::error::AppError> {
-    agent::clear(&state.pool, user.id).await?;
+    let requested_id = if body.is_empty() {
+        None
+    } else {
+        serde_json::from_slice::<ClearChatInput>(&body)
+            .map_err(|_| crate::error::AppError::bad_request("请求格式不正确"))?
+            .conversation_id
+    };
+    let conversation_id = match requested_id {
+        Some(id) => conversation::get_owned(&state.pool, user.id, id).await?.id,
+        None => conversation::active_id(&state.pool, user.id).await?,
+    };
+    agent::clear(&state.pool, user.id, conversation_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -177,14 +201,25 @@ async fn send_chat(
             expires_at: statement.expires_at,
         })
         .collect();
+    let conversation_id = match input.conversation_id {
+        Some(id) => conversation::get_owned(&state.pool, user.id, id).await?.id,
+        None => conversation::active_id(&state.pool, user.id).await?,
+    };
     let context = AgentContext {
         profile: user_profile,
         summary: context::active_summary_text(&state.pool, user.id).await?,
         memories,
     };
-    agent::send(&state.pool, user.id, &profile, &context, &input)
-        .await
-        .map(Json)
+    agent::send(
+        &state.pool,
+        user.id,
+        conversation_id,
+        &profile,
+        &context,
+        &input,
+    )
+    .await
+    .map(Json)
 }
 
 async fn maintain_context(
@@ -192,17 +227,67 @@ async fn maintain_context(
     user: CurrentUser,
     Json(input): Json<ContextMaintainInput>,
 ) -> Result<Json<ContextMaintainResponse>, crate::error::AppError> {
+    let conversation_id = match input.conversation_id {
+        Some(id) => conversation::get_owned(&state.pool, user.id, id).await?.id,
+        None => conversation::active_id(&state.pool, user.id).await?,
+    };
     let profile = settings::get(&state.pool, user.id).await?;
     Ok(Json(
-        context::maintain(&state.pool, user.id, &profile, &input).await?,
+        context::maintain(&state.pool, user.id, conversation_id, &profile, &input).await?,
     ))
 }
 
 async fn list_traces(
     State(state): State<AppState>,
     user: CurrentUser,
+    Query(query): Query<TraceListQuery>,
 ) -> Result<Json<Vec<AgentTrace>>, crate::error::AppError> {
-    Ok(Json(agent::traces(&state.pool, user.id).await?))
+    Ok(Json(
+        agent::traces(&state.pool, user.id, query.conversation_id).await?,
+    ))
+}
+
+async fn list_conversations(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<Json<Vec<conversation::ConversationSummary>>, crate::error::AppError> {
+    Ok(Json(conversation::list(&state.pool, user.id).await?))
+}
+
+async fn create_conversation(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Json(input): Json<CreateConversationInput>,
+) -> Result<Json<conversation::Conversation>, crate::error::AppError> {
+    Ok(Json(
+        conversation::create(&state.pool, user.id, &input).await?,
+    ))
+}
+
+async fn conversation_chat(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<ChatMessage>>, crate::error::AppError> {
+    conversation::get_owned(&state.pool, user.id, id).await?;
+    Ok(Json(agent::history(&state.pool, user.id, id).await?))
+}
+
+async fn activate_conversation(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, crate::error::AppError> {
+    conversation::set_active(&state.pool, user.id, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn delete_conversation(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Uuid>, crate::error::AppError> {
+    Ok(Json(conversation::delete(&state.pool, user.id, id).await?))
 }
 
 async fn get_profile(

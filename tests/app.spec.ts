@@ -3,6 +3,10 @@ import { test, expect } from '@playwright/test';
 // Only the IPC transport is replaced. Production builds always require Tauri.
 // Rust integration tests independently exercise the database and actual ADK tool loop.
 test.beforeEach(async ({ page }) => {
+  await page.route('**/conversations', async route => {
+    if (route.request().method() === 'POST') return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
   await page.addInitScript(() => {
     const ingredients = [{ id: 'gin', name: '金酒', category: 'spirits', owned: false }, { id: 'tonic', name: '汤力水', category: 'mixer', owned: false }];
     const recipes = [{ id: 'gin-tonic', name: '金汤力', nameEn: 'Gin & Tonic', description: '清爽的金酒与汤力水。', category: 'Gin', source: 'builtin', image: 'gin_tonic.png', method: '直调', flavor: { sweet: 1, sour: 2, bitter: 2, strong: 2 }, ingredients: [{ id: 'gin', name: '金酒', amount: 45, unit: 'ml', optional: false }, { id: 'tonic', name: '汤力水', amount: 100, unit: 'ml', optional: false }], steps: ['杯中加冰，加入材料轻轻搅拌。'], missing: ['金酒', '汤力水'], canMake: false }];
@@ -363,18 +367,20 @@ test('chat error preserves draft, retry succeeds, trace opens and context clears
   await expect(page.getByText('model.start')).toBeInViewport();
   await page.getByRole('button', { name: '查看本轮链路' }).click();
   await expect(page.getByRole('region', { name: '链路详情' })).toHaveCount(0);
-  await page.locator('.session-rail .conversation-delete').click();
+  await page.locator('.session-rail .clear-conversation').click();
   await page.getByRole('dialog', { name: '清空这段对话？' }).getByRole('button', { name: '确认清空' }).click();
   await expect(page.getByText('今天过得怎么样？')).toBeVisible();
 });
 
 test('clear chat requires confirmation and cancel or Escape preserves history and draft', async ({ page }) => {
+  page.on('console', message => console.log('BROWSER', message.text()));
   await page.goto('/');
-  const clearButton = page.locator('.session-rail .conversation-delete');
-  await expect(clearButton).toBeEnabled();
+  const clearButton = page.locator('.session-rail .clear-conversation');
+  await expect(clearButton).toBeDisabled();
   await page.getByLabel('说点什么').fill('这段对话要保留');
   await page.getByRole('button', { name: '发送消息' }).click();
   await expect(page.locator('.message')).toHaveCount(2);
+  await expect(clearButton).toBeEnabled();
   await page.getByLabel('说点什么').fill('还没发出的草稿');
   const dialog = page.getByRole('dialog', { name: '清空这段对话？' });
   await clearButton.click();
@@ -401,7 +407,7 @@ test('clear chat blocks duplicates, keeps failures visible and allows a confirme
   await expect(page.locator('.message')).toHaveCount(2);
   await page.getByLabel('说点什么').fill('清空后也保留草稿');
   await page.evaluate(() => { (window as any).__failNextClear(); (window as any).__holdClear(); });
-  await page.getByRole('button', { name: '清空对话', exact: true }).click();
+  await page.locator('.chat-top .page-header .icon-button[aria-label="清空对话"]').click();
   const dialog = page.getByRole('dialog', { name: '清空这段对话？' });
   await dialog.getByRole('button', { name: '确认清空' }).click();
   await expect(dialog.getByRole('button', { name: '正在清空…' })).toBeDisabled();
@@ -418,7 +424,7 @@ test('clear chat blocks duplicates, keeps failures visible and allows a confirme
   await expect(page.locator('.message')).toHaveCount(0);
   await expect(page.locator('.welcome h2')).toBeVisible();
   await expect(page.getByLabel('说点什么')).toHaveValue('清空后也保留草稿');
-  await expect(page.getByRole('button', { name: '清空对话', exact: true })).toBeDisabled();
+  await expect(page.locator('.chat-top .page-header .icon-button[aria-label="清空对话"]')).toBeDisabled();
   await expect.poll(() => page.evaluate(() => (window as any).__clearCalls())).toBe(2);
 });
 
@@ -797,7 +803,7 @@ test('empty chat stays at the top on narrow screens and failed sends do not brin
   await expect(page.getByRole('button', { name: '重试这条消息' })).toBeInViewport();
   await page.getByRole('button', { name: '重试这条消息' }).click();
   await expect(page.locator('.message.assistant')).toHaveCount(1);
-  await page.getByRole('button', { name: '清空对话' }).click();
+  await page.locator('.chat-top .page-header .icon-button[aria-label="清空对话"]').click();
   await page.getByRole('dialog', { name: '清空这段对话？' }).getByRole('button', { name: '确认清空' }).click();
   await expect(page.locator('.welcome h2')).toBeVisible();
   await expect.poll(welcomeIsBelowHeader).toBe(true);
@@ -1343,4 +1349,76 @@ test('web profile panel supports onboarding and constraint memories', async ({ p
   page.on('dialog', dialog => void dialog.accept());
   await page.locator('.memory-item').getByRole('button', { name: '删除' }).click();
   await expect.poll(() => memoryDeleted).toBe(1);
+});
+
+test('web conversation directory creates and switches persisted conversations', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (window as any).__TAURI_INTERNALS__;
+    localStorage.setItem('drink_token', 'web-token');
+    localStorage.setItem('drink_model_key', 'browser-key');
+  });
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ id: 'web-user', email: 'web@example.com', createdAt: '2026-09-25T00:00:00Z' }),
+  }));
+  await page.route('**/ingredients', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/recipes*', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/traces', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route('**/settings', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ name: '', preferences: '', model: 'qwen-plus', baseUrl: 'https://example.com/v1', apiKeyConfigured: true, dataDirectory: 'browser' }),
+  }));
+
+  let createdCalls = 0;
+  let activeCalls = 0;
+  await page.route(/\/api\/conversations$/, async route => {
+    if (route.request().method() === 'POST') {
+      createdCalls += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'conversation-b', title: '新的对话', status: 'active', messageCount: 0, lastMessagePreview: null, lastMessageAt: null, createdAt: '2026-09-25T00:00:00Z', isActive: true }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 'conversation-b', title: '新的对话', status: 'active', messageCount: 0, lastMessagePreview: null, lastMessageAt: null, createdAt: '2026-09-25T00:00:00Z', isActive: true },
+        { id: 'conversation-a', title: '旧话题', status: 'active', messageCount: 2, lastMessagePreview: '旧消息', lastMessageAt: '2026-09-24T00:00:00Z', createdAt: '2026-09-24T00:00:00Z', isActive: false },
+      ]),
+    });
+  });
+  await page.route('**/conversations/conversation-a/chat', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([{ id: 'old-message', role: 'user', text: '旧消息', recipes: [], traceId: null, mode: 'agent', conversationId: 'conversation-a' }]),
+  }));
+  await page.route('**/conversations/conversation-b/chat', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await page.route(/\/api\/conversations\/conversation-a\/active$/, async route => {
+    activeCalls += 1;
+    await route.fulfill({ status: 204, body: '' });
+  });
+  await page.route(/\/api\/conversations\/conversation-b\/active$/, async route => {
+    activeCalls += 1;
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/');
+  await expect(page.getByText('旧话题')).toBeVisible();
+
+  await page.getByRole('button', { name: '新建对话' }).click();
+  await expect.poll(() => createdCalls).toBe(1);
+  await expect(page.locator('.conversation-row')).toHaveCount(2);
+  await expect(page.locator('.conversation')).toContainText('今天过得怎么样？');
+  await page.getByLabel('说点什么').fill('B 的草稿');
+
+  await page.locator('.conversation-item', { hasText: '旧话题' }).click();
+  await expect.poll(() => activeCalls).toBe(1);
+  await expect(page.locator('.conversation')).toContainText('旧消息');
+  await expect(page.getByLabel('说点什么')).toHaveValue('');
+  await page.getByLabel('说点什么').fill('A 的草稿');
+  expect(createdCalls).toBe(1);
 });

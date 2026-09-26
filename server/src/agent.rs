@@ -44,6 +44,7 @@ impl TraceRecorder {
         self,
         pool: &PgPool,
         user_id: uuid::Uuid,
+        conversation_id: uuid::Uuid,
         status: &str,
         error: Option<String>,
     ) -> Result<AgentTrace, AppError> {
@@ -57,12 +58,13 @@ impl TraceRecorder {
         sqlx::query(
             r#"
             INSERT INTO agent_traces
-                (id, user_id, started_at, duration_ms, status, events, error)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                (id, user_id, conversation_id, started_at, duration_ms, status, events, error)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
         )
         .bind(&self.id)
         .bind(user_id)
+        .bind(conversation_id)
         .bind(self.timestamp)
         .bind(duration_ms)
         .bind(status)
@@ -73,15 +75,16 @@ impl TraceRecorder {
         sqlx::query(
             r#"
             DELETE FROM agent_traces
-            WHERE user_id = $1 AND id NOT IN (
+            WHERE user_id = $1 AND conversation_id = $2 AND id NOT IN (
                 SELECT id FROM agent_traces
-                WHERE user_id = $1
+                WHERE user_id = $1 AND conversation_id = $2
                 ORDER BY started_at DESC, created_at DESC
                 LIMIT 100
             )
             "#,
         )
         .bind(user_id)
+        .bind(conversation_id)
         .execute(pool)
         .await?;
 
@@ -167,17 +170,22 @@ fn read_chat_message(row: sqlx::postgres::PgRow) -> Result<ChatMessage, AppError
     })
 }
 
-async fn load_history(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<ChatMessage>, AppError> {
+async fn load_history(
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
+) -> Result<Vec<ChatMessage>, AppError> {
     let mut messages: Vec<_> = sqlx::query(
         r#"
         SELECT id, role, text, recipes, trace_id, mode
         FROM chat_messages
-        WHERE user_id = $1
+        WHERE user_id = $1 AND conversation_id = $2
         ORDER BY created_at DESC, id DESC
-        LIMIT $2
+        LIMIT $3
         "#,
     )
     .bind(user_id)
+    .bind(conversation_id)
     .bind(MAX_HISTORY_MESSAGES as i64)
     .fetch_all(pool)
     .await?
@@ -188,16 +196,21 @@ async fn load_history(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<ChatMess
     Ok(messages)
 }
 
-pub async fn history(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<ChatMessage>, AppError> {
+pub async fn history(
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
+) -> Result<Vec<ChatMessage>, AppError> {
     sqlx::query(
         r#"
         SELECT id, role, text, recipes, trace_id, mode
         FROM chat_messages
-        WHERE user_id = $1
+        WHERE user_id = $1 AND conversation_id = $2
         ORDER BY created_at, id
         "#,
     )
     .bind(user_id)
+    .bind(conversation_id)
     .fetch_all(pool)
     .await?
     .into_iter()
@@ -205,29 +218,41 @@ pub async fn history(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<ChatMessa
     .collect()
 }
 
-pub async fn clear(pool: &PgPool, user_id: uuid::Uuid) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM chat_messages WHERE user_id = $1")
+pub async fn clear(
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM chat_messages WHERE user_id = $1 AND conversation_id = $2")
         .bind(user_id)
+        .bind(conversation_id)
         .execute(pool)
         .await?;
-    sqlx::query("DELETE FROM agent_traces WHERE user_id = $1")
+    sqlx::query("DELETE FROM agent_traces WHERE user_id = $1 AND conversation_id = $2")
         .bind(user_id)
+        .bind(conversation_id)
         .execute(pool)
         .await?;
     Ok(())
 }
 
-pub async fn traces(pool: &PgPool, user_id: uuid::Uuid) -> Result<Vec<AgentTrace>, AppError> {
+pub async fn traces(
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    conversation_id: Option<uuid::Uuid>,
+) -> Result<Vec<AgentTrace>, AppError> {
     sqlx::query(
         r#"
         SELECT id, started_at, duration_ms, status, events, error
         FROM agent_traces
         WHERE user_id = $1
+          AND ($2::UUID IS NULL OR conversation_id = $2)
         ORDER BY started_at DESC, created_at DESC
         LIMIT 100
         "#,
     )
     .bind(user_id)
+    .bind(conversation_id)
     .fetch_all(pool)
     .await?
     .into_iter()
@@ -268,6 +293,7 @@ fn read_trace(row: sqlx::postgres::PgRow) -> Result<AgentTrace, AppError> {
 pub(super) async fn save_turn(
     pool: &PgPool,
     user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
     message: &str,
     trace_id: &str,
     reply: &str,
@@ -275,20 +301,23 @@ pub(super) async fn save_turn(
 ) -> Result<ChatMessage, AppError> {
     let recipes_value = serde_json::to_value(recipes).map_err(|_| AppError::internal())?;
     sqlx::query(
-        "INSERT INTO chat_messages (user_id, role, text, recipes, mode) VALUES ($1, 'user', $2, '[]'::jsonb, 'agent')",
+        "INSERT INTO chat_messages (user_id, conversation_id, role, text, recipes, mode) VALUES ($1, $2, 'user', $3, '[]'::jsonb, 'agent')",
     )
     .bind(user_id)
+    .bind(conversation_id)
     .bind(message.trim())
     .execute(pool)
     .await?;
+    crate::conversation::touch(pool, conversation_id, message).await?;
     let row = sqlx::query(
         r#"
-        INSERT INTO chat_messages (user_id, role, text, recipes, trace_id, mode)
-        VALUES ($1, 'assistant', $2, $3, $4, 'agent')
+        INSERT INTO chat_messages (user_id, conversation_id, role, text, recipes, trace_id, mode)
+        VALUES ($1, $2, 'assistant', $3, $4, $5, 'agent')
         RETURNING id
         "#,
     )
     .bind(user_id)
+    .bind(conversation_id)
     .bind(reply)
     .bind(&recipes_value)
     .bind(trace_id)
@@ -309,6 +338,7 @@ pub(super) async fn save_turn(
 pub async fn send(
     pool: &PgPool,
     user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
     settings: &Settings,
     context: &AgentContext,
     input: &ChatSendInput,
@@ -317,21 +347,37 @@ pub async fn send(
     let trace_id = trace.id.clone();
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(90),
-        send_inner(pool, user_id, settings, context, input, &trace),
+        send_inner(
+            pool,
+            user_id,
+            conversation_id,
+            settings,
+            context,
+            input,
+            &trace,
+        ),
     )
     .await
     .unwrap_or_else(|_| Err(AppError::bad_request("模型调用整体超时，请稍后重试")));
     match result {
         Ok(message) => {
             trace.push("turn.complete", "对话已保存");
-            trace.complete(pool, user_id, "ok", None).await?;
+            trace
+                .complete(pool, user_id, conversation_id, "ok", None)
+                .await?;
             Ok(message)
         }
         Err(error) => {
             let detail = error.message().to_owned();
             trace.push("turn.error", detail.clone());
             trace
-                .complete(pool, user_id, "error", Some(detail.clone()))
+                .complete(
+                    pool,
+                    user_id,
+                    conversation_id,
+                    "error",
+                    Some(detail.clone()),
+                )
                 .await?;
             Err(AppError::bad_request(format!(
                 "{detail}（链路 {trace_id}）"
@@ -343,6 +389,7 @@ pub async fn send(
 async fn send_inner(
     pool: &PgPool,
     user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
     settings: &Settings,
     context: &AgentContext,
     input: &ChatSendInput,
@@ -360,7 +407,7 @@ async fn send_inner(
             AppError::bad_request("请先在设置中填写 API Key")
         })?;
     trace.push("context.load", "读取最近对话");
-    let history = load_history(pool, user_id).await?;
+    let history = load_history(pool, user_id, conversation_id).await?;
     if let Some(_summary) = &context.summary {
         trace.push("summary.load", "已注入滚动对话摘要");
     }
@@ -379,6 +426,7 @@ async fn send_inner(
     crate::agent_runner::run(
         pool,
         user_id,
+        conversation_id,
         settings,
         context,
         &input.message,

@@ -162,6 +162,7 @@ async fn seed_staging_session(
 pub(super) async fn run(
     pool: &PgPool,
     user_id: uuid::Uuid,
+    conversation_id: uuid::Uuid,
     settings: &Settings,
     context: &AgentContext,
     message: &str,
@@ -359,5 +360,14 @@ pub(super) async fn run(
         "output.accepted",
         format!("校验通过，{} 张菜单卡片", recipes.len()),
     );
-    save_turn(pool, user_id, message, &trace.id, &reply, &recipes).await
+    save_turn(
+        pool,
+        user_id,
+        conversation_id,
+        message,
+        &trace.id,
+        &reply,
+        &recipes,
+    )
+    .await
 }
