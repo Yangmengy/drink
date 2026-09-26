@@ -85,6 +85,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Sync dist to server
+        timeout-minutes: 5
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
@@ -94,12 +95,22 @@ jobs:
           ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
           tar -C dist -czf /tmp/dist.tar.gz .
           scp -i ~/.ssh/deploy_key /tmp/dist.tar.gz ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }}:/tmp/
-          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} \
-            "rm -rf ${{ env.SERVER_DIR }}/html/* && tar -C ${{ env.SERVER_DIR }}/html -xzf /tmp/dist.tar.gz && rm /tmp/dist.tar.gz"
+          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          exec 9>/tmp/drink-frontend-deploy.lock
+          flock -w 120 9
+          rm -rf /opt/drink/deploy/html/*
+          tar -C /opt/drink/deploy/html -xzf /tmp/dist.tar.gz
+          rm /tmp/dist.tar.gz
+          REMOTE
 
   deploy-backend:
     needs: build-and-push
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: server-backend-deploy
+      cancel-in-progress: false
     steps:
       - name: Pull and restart API container
         env:
@@ -109,5 +120,29 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} \
-            "cd ${{ env.SERVER_DIR }} && docker compose pull api && docker compose up -d api"
+          ssh -i ~/.ssh/deploy_key ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          exec 9>/tmp/drink-backend-deploy.lock
+          flock -w 1200 9
+          cd /opt/drink/deploy
+          docker compose pull api
+          for attempt in 1 2 3 4 5; do
+            if docker compose up -d api; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "API container recreate failed after 5 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error http://127.0.0.1/api/ready; then
+              echo
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API readiness check failed" >&2
+          exit 1
+          REMOTE
